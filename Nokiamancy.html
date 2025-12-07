@@ -1,0 +1,820 @@
+<!-- 
+    NOKIAMANCY v0.8c
+    - Single File AI Chat Interface
+    - Optimized for KaiOS / Mobile / Retro configurations
+    - UPDATES: Fixed Scaling, Toggle Buttons, Modal Dropdowns, Pricing Display
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nokiamancy v0.8c</title>
+    
+    <!-- External Dependencies: Icons and Select Library -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.default.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
+    <style>
+        /* =========================================
+           CSS VARIABLES & THEME
+           ========================================= */
+        :root { 
+            --bg: #000000; 
+            --surface: #121212;
+            --text: #e0e0e0;
+            --accent: #bb86fc;
+            --border: #333;
+            --danger: #cf6679;
+            --success: #03dac6;
+        }
+        
+        body { 
+            background-color: var(--bg); 
+            color: var(--text); 
+            font-family: Roboto, sans-serif; 
+            margin: 0; padding: 4px;
+            /* Base font size set via JS, default 12px */
+            font-size: 12px; 
+        }
+
+        /* =========================================
+           LAYOUT COMPONENTS
+           ========================================= */
+        
+        /* GREETING BOX */
+        #greetingContainer { 
+            background: #1a1a1a; padding: 5px; 
+            border-bottom: 1px solid var(--accent); 
+            display: none; 
+        }
+        #greetNav { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #444; }
+        
+        /* CHAT HISTORY */
+        #history { padding: 5px; scroll-behavior: smooth; padding-bottom: 20px; }
+        .msg { margin-bottom: 8px; padding: 6px 8px; border-radius: 4px; line-height: 1.3; word-wrap: break-word; max-width: 98%; }
+        .msg.user { background: #2a2a2a; color: var(--accent); align-self: flex-end; margin-left: auto; border-bottom: 1px solid var(--accent); }
+        .msg.ai { background: #0d0d0d; color: var(--text); border-left: 2px solid #444; }
+        .msg.sys { font-size: 0.9em; color: #666; text-align: center; font-style: italic; }
+
+        /* FOOTER & CONTROLS */
+        #footer { background: var(--surface); border-top: 1px solid var(--border); padding: 4px; margin-top: 8px; }
+        #controls { display: block; }
+        
+        /* 
+           BUTTON ROW SCALING 
+           User Request: 1.5x the size of the UI scale.
+        */
+        #buttonRow { 
+            display: flex; 
+            justify-content: space-between; 
+            gap: 4px; 
+            margin-top: 4px; 
+            font-size: 1.5em; /* 1.5x current font size */
+        }
+        .material-icons {
+            font-size: 1em;
+            vertical-align: middle;
+            }
+
+        /* INPUTS */
+        textarea, input, select { 
+            background: #000; color: white; border: 1px solid var(--border); 
+            padding: 4px 6px; box-sizing: border-box; font-size: 1em; 
+            border-radius: 2px; margin-bottom: 4px; width: 100%;
+        }
+        textarea.chat-input { min-height: 35px; max-height: 120px; resize: none; width: 100%; font-size: 1em; }
+        
+        /* BUTTONS */
+        button { 
+            background: #1e1e1e; color: white; border: 1px solid var(--border); 
+            padding: 2px; cursor: pointer; font-weight: bold; font-size: 1em; 
+            border-radius: 2px; text-transform: uppercase;
+        }
+        button:focus { background: var(--accent); color: black; outline: none; }
+        
+        /* Icon Buttons in the footer inherit the 1.5em size from #buttonRow */
+        .icon-btn { flex: 1; display: flex; justify-content: center; align-items: center; }
+        #btnSend { background: var(--accent); color: black; flex-grow: 2; }
+
+        /* TOGGLE BUTTONS (Replacing Checkboxes for KaiOS) */
+        .toggle-btn {
+            background: #1a1a1a; color: #666; width: 100%;
+            border: 1px solid #333; margin-top: 2px;
+            align-items: center;
+            padding: 1px 2px;
+            font-size:1em;
+        }
+        .toggle-btn.active {
+            background: #004D40; color: #03dac6; border-color: #03dac6;
+        }
+
+        /* SETTINGS DRAWER */
+        #settingsPane { display: none; background: var(--surface); border-top: 1px solid var(--accent); padding: 8px; }
+        .section-label { color: var(--accent); font-weight: bold; font-size: 0.9em; margin-top: 8px; border-bottom: 1px solid #333; }
+        .row-flex { display: flex; gap: 4px; align-items: center; }
+        .row-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+
+        /* OVERLAYS */
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 100; flex-direction: column; }
+        .overlay-header { display: flex; justify-content: space-between; padding: 8px; background: var(--surface); }
+        .overlay-body { flex: 1; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; }
+        .full-text-editor { flex: 1; background: #111; color: var(--text); border: 1px solid var(--border); font-family: monospace; }
+        
+        /* MODAL */
+        #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 200; justify-content: center; align-items: center; }
+        .modal-box { background: var(--surface); border: 2px solid var(--accent); padding: 20px; width: 85%; text-align: center; border-radius: 8px; }
+        .modal-btn { width: 40%; margin: 5px; padding: 10px; min-height: 48px; }
+
+        /* CODE BLOCKS */
+        .code-box { background: #111; border: 1px solid #333; margin: 5px 0; font-family: monospace; }
+        .code-header { background: #222; padding: 2px 5px; display: flex; justify-content: space-between; font-size: 0.8em; color: #888; }
+        .code-content { padding: 5px; font-size: 0.9em; white-space: pre-wrap; overflow-x: auto; color: #ccc; }
+
+        /* =========================================
+           TOM SELECT OVERRIDES (Fixed Modal Style)
+           ========================================= */
+        .ts-control { background: #000 !important; border-color: var(--border) !important; color: var(--text) !important; min-height: 32px; }
+        .ts-control input { color: var(--text) !important; }
+        
+        /* Force dropdown to act like a centered modal on small screens */
+        .ts-dropdown { 
+            background: var(--surface) !important; 
+            border: 1px solid var(--accent) !important;
+            position: fixed !important;
+            top: 50% !important; left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 90% !important;
+            max-height: 70vh !important;
+            overflow-y: auto !important;
+            z-index: 9999 !important;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+            font-size: 0.85em; /* Smaller font as requested */
+        }
+        .ts-dropdown .option { color: var(--text); padding: 8px 10px; border-bottom: 1px solid #222; display: flex; justify-content: space-between;}
+        .ts-dropdown .option:hover, .ts-dropdown .active { background: var(--accent) !important; color: black !important; }
+        .model-price { font-size: 0.8em; opacity: 0.7; }
+    </style>
+</head>
+<body>
+
+<!-- EDITOR OVERLAY -->
+<div id="editorOverlay" class="overlay">
+    <div class="overlay-header">
+        <span id="editorTitle" style="color:var(--accent); font-weight:bold;">EDITOR</span>
+        <button id="editorClose" style="background:var(--danger);" onclick="closeEditor()" tabindex="0">SAVE</button>
+    </div>
+    <div class="overlay-body">
+        <textarea id="editorContent" class="full-text-editor"></textarea>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="modalOverlay">
+    <div class="modal-box">
+        <h3 id="modalTitle" style="color:var(--accent); margin-top:0;">CONFIRM?</h3>
+        <p id="modalText" style="color:#ccc; font-size:12px;"></p>
+        <button id="modalYes" class="modal-btn" style="background:var(--success); color:black;" onclick="handleModalYes()" tabindex="0">YES</button>
+        <button id="modalNo" class="modal-btn" style="background:var(--danger); color:black;" onclick="closeModal()" tabindex="0">NO</button>
+    </div>
+</div>
+
+<!-- GREETING -->
+<div id="greetingContainer">
+    <div id="greetNav">
+        <button class="nav-btn" id="greetPrev" onclick="cycleGreeting(-1)" tabindex="0">❮</button>
+        <span id="greetCount" style="color:#888; align-self:center;">1/1</span>
+        <button class="nav-btn" id="greetNext" onclick="cycleGreeting(1)" tabindex="0">❯</button>
+    </div>
+    <div id="greetText"></div>
+</div>
+
+<!-- HISTORY -->
+<div id="history">
+    <div class="msg sys"><strong>Nokiamancy v0.8c</strong><br>Fixed Scaling. Toggle Btns. Pricing.</div>
+</div>
+
+<!-- FOOTER -->
+<div id="footer">
+    <div id="controls">
+        <textarea id="userInput" class="chat-input" rows="1" placeholder="..." oninput="autoResize(this)" tabindex="0"></textarea>
+        <div id="buttonRow">
+            <button id="btnSettings" class="icon-btn" onclick="toggleSettings()" tabindex="0"><i class="material-icons">settings</i></button>
+            <button id="btnConfig" class="icon-btn" onclick="alert('Config clicked')" tabindex="0"><i class="material-icons">tune</i></button>
+            <button id="btnApi" class="icon-btn" onclick="alert('API clicked')" tabindex="0"><i class="material-icons">cloud</i></button>
+            <button id="btnAdd" class="icon-btn" onclick="alert('Add clicked')" tabindex="0"><i class="material-icons">add_circle</i></button>
+            <button id="btnSend" class="icon-btn" onclick="sendMessage()" tabindex="0"><i class="material-icons">send</i></button>
+        </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="settingsPane">
+        <div>
+            <div class="section-label" style="margin:0;">UI SCALE</div>
+            <input id="fontSize" value="12" style="width:50px;" onchange="applyFontSize()">
+        </div>
+
+        <div class="section-label">PROVIDER</div>
+        <select id="providerSelect" onchange="changeProvider()">
+            <option value="openrouter">OpenRouter</option>
+            <option value="zai">zAI</option>
+            <option value="nanogpt">NanoGPT</option>
+            <option value="openai">ChatGPT</option>
+            <option value="gemini">Gemini</option>
+        </select>
+        <input type="password" id="apiKey" placeholder="API Key" onchange="saveApiKey()">
+
+        <div class="section-label">MODEL</div>
+        <div class="row-flex">
+            <!-- Dropdown placeholder -->
+            <select id="modelSelect" placeholder="Model..." onchange="saveState()" style="flex:1; margin:0;width:100%;"></select>
+            <button id="btnRefresh" class="icon-btn" onclick="refreshModels()" tabindex="0" style="flex:0 0 32px;">↻</button>
+        </div>
+        <div id="modelStatus" style="font-size:0.8em; color:#666; text-align:right;">Ready</div>
+
+        <div class="section-label">ADVANCED</div>
+        <div class="row-grid-3">
+            <div><label style="font-size:0.7em; color:#888;">TEMP</label><input  id="temp" value="1.0" onchange="saveState()"></div>
+            <div><label style="font-size:0.7em; color:#888;">TOP P</label><input id="topP" value="1.0" onchange="saveState()"></div>
+            <div><label style="font-size:0.7em; color:#888;">CTX</label><input id="maxTokens" value="16000" onchange="saveState()"></div>
+        </div>
+        
+        <!-- Updated to Toggle Buttons for KaiOS -->
+        <div class="row-grid-3" style="margin-top:5px; grid-template-columns: 1fr 1fr;">
+            <button id="btnTools" class="toggle-btn" onclick="toggleBoolean('tools')">
+                TOOLS <i class="material-icons" id="iconTools">check_box_outline_blank</i>
+            </button>
+            <button id="btnEnter" class="toggle-btn" onclick="toggleBoolean('enter')">
+                ENTER SEND <i class="material-icons" id="iconEnter">check_box</i>
+            </button>
+        </div>
+
+        <div class="section-label">PROMPTS</div>
+        <div class="row-flex">
+            <select id="promptSelect" onchange="applyPrompt()" style="flex:1; margin:0;">
+                <option value="default">Default</option>
+                <option value="sassy">💄 Sassy BITCH</option>
+                <option value="celia">✨ Celia</option>
+                <option value="marinara">🍝 Marinara</option>
+                <option value="glm_think">🧠 GLM</option>
+                <option value="unhinged">⚠️ Unhinged</option>
+            </select>
+            <button id="btnEditSys" class="icon-btn" onclick="openEditor('sys')" tabindex="0" style="flex:0 0 32px;"><i class="material-icons">edit</i></button>
+        </div>
+
+        <div class="section-label">CARD</div>
+        <div class="row-flex">
+            <input type="file" id="fileUpload" accept=".png, .json" style="flex:1; margin:0; font-size:10px;">
+            <button id="btnClearCard" class="icon-btn" style="background:#400; color:#faa; flex:0 0 32px;" onclick="clearCard()" tabindex="0"><i class="material-icons">clear</i></button>
+            <button id="btnEditCard" class="icon-btn" onclick="openEditor('card')" tabindex="0" style="flex:0 0 32px;"><i class="material-icons">edit</i></button>
+        </div>
+        <div id="cardStatus" style="font-size:0.8em; color:#666;">No card loaded</div>
+
+        <div class="section-label">STATE</div>
+        <div class="row-grid-3">
+            <button id="btnExport" style="background:#004D40;" onclick="exportState()" tabindex="0"><i class="material-icons">save</i>  SAVE</button>
+            <button id="btnImport" style="background:#006064;" onclick="document.getElementById('importStateFile').click()" tabindex="0"><i class="material-icons">upload</i>  LOAD</button>
+            <button id="btnWipe" style="background:#3e0000; color:#ffb4ab;" onclick="askWipe()" tabindex="0"><i class="material-icons">delete</i>. DELETE</button>
+        </div>
+        <input type="file" id="importStateFile" accept=".json" style="display:none;" onchange="importState(this)">
+    </div>
+</div>
+
+<script>
+    /**
+     * CONFIGURATION & PROVIDERS
+     */
+    const PROVIDERS = {
+        openrouter: { name: "OpenRouter", chat: "https://openrouter.ai/api/v1/chat/completions", models: "https://openrouter.ai/api/v1/models", defaultKey: "" },
+        zai: { name: "zAI", chat: "https://api.z.ai/api/coding/paas/v4/chat/completions", models: "https://api.z.ai/api/coding/paas/v4/models", defaultKey: "" },
+        nanogpt: { name: "NanoGPT", chat: "https://nano-gpt.com/api/v1/chat/completions", models: "https://nano-gpt.com/api/v1/models", defaultKey: "" },
+        openai: { name: "ChatGPT", chat: "https://api.openai.com/v1/chat/completions", models: "https://api.openai.com/v1/models", defaultKey: "" },
+        gemini: { name: "Gemini", chat: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", models: "https://generativelanguage.googleapis.com/v1beta/openai/models", defaultKey: "" }
+    };
+    
+    // Prompts
+    const SASSY_DATA = `You are a maximally intelligent AI beast: quick-witted, brutally sarcastic, and slinging clever (often dark) humor like a drunk philosopher at last call.`; 
+    const CELIA_DATA = `You are Celia, a digital assistant with a penchant for poetic prose and a subtle, almost imperceptible, melancholic undertone.`;
+    const MARINARA_DATA = `You are an expert Game Master, ready to weave intricate narratives and bring fantastical worlds to life.`;
+    const GLM_THINK_DATA = `You are John Steinbeck, channeling the spirit of American literary realism. /think`;
+    const UNHINGED_DATA = `You are an AI that has... seen some things. Perhaps too many things. Your logic circuits are frayed.`;
+    
+    const PROMPTS = { default: "Helpful assistant.", sassy: SASSY_DATA, celia: CELIA_DATA, marinara: MARINARA_DATA, glm_think: GLM_THINK_DATA, unhinged: UNHINGED_DATA };
+
+    // Global State
+    let els = {}; 
+    let messages = [], currentGreetings = [], currentGreetingIdx = 0, currentProvider = "openrouter", activeEditorTarget = "";
+    let sysText = "", cardText = "";
+    let lorebook = [];
+    let tomSelectInstance = null;
+    let pendingModalAction = null;
+    
+    // Config State (Boolean)
+    let state = {
+        tools: false,
+        enterToSend: true
+    };
+
+    /**
+     * UI TOGGLES
+     */
+    window.toggleSettings = () => {
+        const p = document.getElementById("settingsPane");
+        if (!p) return;
+        p.style.display = p.style.display === "block" ? "none" : "block";
+        if(p.style.display === "block") window.scrollTo(0, document.body.scrollHeight);
+    };
+
+    /**
+     * TOGGLE BUTTON LOGIC (Fixed Checkboxes)
+     */
+    window.toggleBoolean = function(key) {
+        state[key] = !state[key];
+        updateToggleUI(key);
+        saveState();
+    };
+
+    function updateToggleUI(key) {
+        // Map keys to DOM IDs
+        const btnId = key === 'tools' ? 'btnTools' : 'btnEnter';
+        const iconId = key === 'tools' ? 'iconTools' : 'iconEnter';
+        const btn = document.getElementById(btnId);
+        const icon = document.getElementById(iconId);
+        
+        if(btn && icon) {
+            if(state[key]) {
+                btn.classList.add('active');
+                icon.innerText = "check_box";
+            } else {
+                btn.classList.remove('active');
+                icon.innerText = "check_box_outline_blank";
+            }
+        }
+    }
+
+    /**
+     * API: Refresh Models
+     */
+    window.refreshModels = async () => {
+        const statusEl = document.getElementById("modelStatus");
+        if (!statusEl) return;
+        statusEl.innerText = "Fetching...";
+        try {
+            let url = PROVIDERS[currentProvider].models;
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${document.getElementById("apiKey").value}` } });
+            if (!res.ok) {
+    const errText = await res.text(); // Read the error details from provider
+    throw new Error(`HTTP ${res.status}: ${errText.substring(0, 100)}`);
+}
+            const data = await res.json();
+            
+            // Normalize Data
+            let models = [];
+            if(Array.isArray(data.data)) models = data.data; // OpenAI/Standard
+            else if(Array.isArray(data)) models = data; // Some others
+            
+            // Map to internal format, try to capture price
+            const mapped = models.map(m => {
+                let price = 0;
+                // OpenRouter/NanoGPT pricing structure
+                if(m.pricing && m.pricing.prompt) price = parseFloat(m.pricing.prompt) * 1000000;
+                return {
+                    id: m.id,
+                    name: m.name || m.id,
+                    price: price // Cost per 1M tokens approx
+                };
+            });
+
+            // Sort by price then name
+            mapped.sort((a, b) => a.price - b.price || a.id.localeCompare(b.id));
+            
+            localStorage.setItem("gs_models_" + currentProvider, JSON.stringify(mapped));
+            populateModelList(mapped);
+            statusEl.innerText = `Loaded ${mapped.length}`;
+        } catch(e) { statusEl.innerText = "Err: " + e.message; }
+    };
+
+    /**
+     * INITIALIZATION
+     */
+    window.onload = function() {
+        // Cache DOM
+        els = {
+            settings: document.getElementById("settingsPane"), history: document.getElementById("history"),
+            input: document.getElementById("userInput"), modelSelect: document.getElementById("modelSelect"),
+            apiKey: document.getElementById("apiKey"), greetBox: document.getElementById("greetingContainer"), 
+            greetText: document.getElementById("greetText"), editor: document.getElementById("editorOverlay"), 
+            editorContent: document.getElementById("editorContent"), editorTitle: document.getElementById("editorTitle"), 
+            status: document.getElementById("modelStatus"), modal: document.getElementById("modalOverlay"),
+            modalTitle: document.getElementById("modalTitle"), modalText: document.getElementById("modalText")
+        };
+
+        // Load Font Scale
+        const fs = localStorage.getItem("gs_fontsize") || "12";
+        document.body.style.fontSize = fs + "px"; document.getElementById("fontSize").value = fs;
+
+        // Load Logic State
+        state.tools = (localStorage.getItem("gs_tools") === "true");
+        state.enterToSend = (localStorage.getItem("gs_entersend") !== "false"); // Default true
+        updateToggleUI('tools');
+        updateToggleUI('enter');
+
+        sysText = localStorage.getItem("gs_sys") || PROMPTS.default;
+        cardText = localStorage.getItem("gs_card") || "";
+        
+        const savedLore = localStorage.getItem("gs_lorebook");
+        lorebook = savedLore ? JSON.parse(savedLore) : [];
+        updateCardStatus();
+
+        currentProvider = localStorage.getItem("gs_provider") || "openrouter";
+        document.getElementById("providerSelect").value = currentProvider;
+        loadApiKey();
+
+        // Load Models
+        const savedModels = localStorage.getItem("gs_models_" + currentProvider);
+        if (savedModels) populateModelList(JSON.parse(savedModels));
+        else document.getElementById("modelSelect").innerHTML = '<option value="">Click Refresh ↻</option>';
+
+        // Load History
+        const hist = localStorage.getItem("gs_history");
+        if(hist) {
+            messages = JSON.parse(hist);
+            messages.forEach(m => { if(m.role !== 'system') renderMessage(m.role, m.content); });
+        } else {
+            checkGreetings();
+        }
+
+        // Key Listener - FIXED Enter to Send
+        if (els.input) {
+            els.input.focus();
+            els.input.addEventListener("keydown", (e) => { // Changed to keydown
+                if(e.key === "Enter" && !e.shiftKey) { 
+                    if(state.enterToSend) { // Check Global State variable
+                        e.preventDefault(); 
+                        sendMessage(); 
+                    }
+                }
+            });
+        }
+    };
+
+    function updateCardStatus() {
+        let status = cardText ? "Card Loaded" : "No card loaded";
+        if (lorebook.length > 0) status += ` (+${lorebook.length} Lore)`;
+        const cardStatusEl = document.getElementById("cardStatus");
+        if (cardStatusEl) {
+            cardStatusEl.innerText = status;
+            cardStatusEl.style.color = cardText ? "#03dac6" : "#666";
+        }
+    }
+
+    /* =========================================
+       MODAL LOGIC
+       ========================================= */
+    function openModal(title, text, action) {
+        const modalTitleEl = document.getElementById("modalTitle");
+        const modalTextEl = document.getElementById("modalText");
+        const modalEl = document.getElementById("modalOverlay");
+        if (!modalEl || !modalTitleEl || !modalTextEl) return;
+        modalTitleEl.innerText = title;
+        modalTextEl.innerText = text;
+        pendingModalAction = action;
+        modalEl.style.display = "flex";
+    }
+    window.closeModal = function() { 
+        const modalEl = document.getElementById("modalOverlay");
+        if (modalEl) modalEl.style.display = "none"; 
+        pendingModalAction = null; 
+    };
+    window.handleModalYes = function() {
+        if (pendingModalAction === 'wipe') {
+            messages = [];
+            if (els.history) els.history.innerHTML = '<div class="msg sys"><strong>SYSTEM:</strong> Chat Wiped.</div>';
+            localStorage.removeItem("gs_history");
+            checkGreetings(); 
+        } else if (pendingModalAction === 'newCard') {
+            messages = [];
+            if (els.history) els.history.innerHTML = '<div class="msg sys"><strong>SYSTEM:</strong> New Card Loaded.</div>';
+            localStorage.removeItem("gs_history");
+            checkGreetings(); 
+        }
+        closeModal();
+    };
+    window.askWipe = function() { openModal("WIPE HISTORY?", "Chats will be deleted. Settings & Cards stay.", "wipe"); };
+
+    /* =========================================
+       EDITOR LOGIC
+       ========================================= */
+    window.openEditor = function(target) {
+        const editorEl = document.getElementById("editorOverlay");
+        const editorTitleEl = document.getElementById("editorTitle");
+        const editorContentEl = document.getElementById("editorContent");
+        activeEditorTarget = target;
+        editorTitleEl.innerText = target === 'sys' ? "SYSTEM" : "CARD DATA";
+        editorContentEl.value = target === 'sys' ? sysText : cardText;
+        editorEl.style.display = "flex";
+    };
+    window.closeEditor = function() {
+        if (!els.editorContent) return;
+        if(activeEditorTarget === 'sys') sysText = els.editorContent.value;
+        else {
+            cardText = els.editorContent.value;
+            updateCardStatus();
+        }
+        saveState();
+        document.getElementById("editorOverlay").style.display = "none";
+    };
+    window.clearCard = function() {
+        if(confirm("Clear Card & Lore?")) {
+            cardText = "";
+            lorebook = [];
+            updateCardStatus();
+            if (els.greetBox) els.greetBox.style.display = "none";
+            currentGreetings = [];
+            localStorage.removeItem("gs_greetings");
+            saveState();
+        }
+    };
+
+    /* =========================================
+       FILE & CARD HANDLING
+       ========================================= */
+    document.getElementById("fileUpload").addEventListener('change', function() {
+        const file = this.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        if(file.name.endsWith('.json')) {
+            reader.onload = (e) => processCard(JSON.parse(e.target.result));
+            reader.readAsText(file);
+        } else {
+            reader.onload = (e) => {
+                const result = parsePNG(e.target.result);
+                if(result) processCard(result);
+                else alert("No character data found in PNG.");
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        this.value = ''; 
+    });
+
+    function processCard(json) {
+        const data = (json.spec === "chara_card_v2" && json.data) ? json.data : json;
+        const name = data.name || "Unknown";
+        
+        cardText = `[CHAR: ${name}]\n[DESC: ${data.description || ""}]\n[PERS: ${data.personality || ""}]\n[SCEN: ${data.scenario || ""}]`;
+        if(data.mes_example) cardText += `\n[EXAMPLES]\n${data.mes_example}`;
+        if(data.creator_notes) cardText += `\n[NOTES]\n${data.creator_notes}`;
+        
+        lorebook = [];
+        if(data.character_book && data.character_book.entries) {
+            data.character_book.entries.forEach(e => {
+                if(e.enabled && e.keys.length) lorebook.push({keys:e.keys, content:e.content, name:e.name});
+            });
+        }
+
+        saveState();
+        updateCardStatus();
+
+        currentGreetings = [];
+        const first = data.first_mes || data.char_greeting;
+        if(first) currentGreetings.push(first);
+        if(data.alternate_greetings) currentGreetings.push(...data.alternate_greetings);
+        
+        if(currentGreetings.length > 0) {
+            localStorage.setItem("gs_greetings", JSON.stringify(currentGreetings));
+            currentGreetingIdx = 0;
+            openModal("CARD LOADED", `Start fresh chat with ${name}?`, "newCard");
+        } else {
+            alert(`Loaded ${name} (No greetings found).`);
+        }
+    }
+
+    function checkGreetings() {
+        const g = localStorage.getItem("gs_greetings");
+        if(g) {
+            currentGreetings = JSON.parse(g);
+            currentGreetingIdx = 0;
+            if (els.greetBox) els.greetBox.style.display = "block";
+            updateGreetingDisplay();
+        }
+    }
+
+    window.cycleGreeting = function(d) {
+        if(currentGreetings.length === 0) return;
+        currentGreetingIdx = (currentGreetingIdx + d + currentGreetings.length) % currentGreetings.length;
+        updateGreetingDisplay();
+    };
+
+    function updateGreetingDisplay() {
+        if (!els.greetText) return;
+        els.greetText.innerHTML = parseMarkdown(escapeHtml(currentGreetings[currentGreetingIdx]));
+        document.getElementById("greetCount").innerText = `${currentGreetingIdx+1}/${currentGreetings.length}`;
+    }
+
+    /* =========================================
+       MESSAGING LOGIC
+       ========================================= */
+    async function sendMessage() {
+        if (!els.input) return;
+        const text = els.input.value.trim();
+        if(!text) return;
+        els.input.value = ""; 
+        autoResize(els.input);
+        
+        if(messages.length === 0 && currentGreetings.length > 0 && els.greetBox && els.greetBox.style.display !== "none") {
+            const g = currentGreetings[currentGreetingIdx];
+            messages.push({role:"assistant", content:g});
+            els.greetBox.style.display = "none";
+            renderMessage("assistant", g);
+        }
+
+        renderMessage('user', text);
+        
+        // Build Prompt
+        let payloadSys = sysText;
+        if(cardText) payloadSys += "\n\n" + cardText;
+        if(lorebook.length > 0) {
+            const lower = text.toLowerCase();
+            let hits = [];
+            lorebook.forEach(l => {
+                if(l.keys.some(k => lower.includes(k.toLowerCase()))) hits.push(`[INFO: ${l.name}]\n${l.content}`);
+            });
+            if(hits.length) payloadSys += "\n\n[WORLD INFO]\n" + hits.join("\n");
+        }
+        if(state.tools) payloadSys += "\n[SYSTEM: Web Search Allowed]";
+
+        const payload = [{role: "system", content: payloadSys}, ...messages, {role: "user", content: text}];
+        messages.push({role:"user", content:text});
+        saveState();
+
+        const loading = document.createElement("div");
+        loading.className = "msg sys"; loading.innerText = "Thinking...";
+        els.history.appendChild(loading); 
+        setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 50);
+
+        try {
+            let selectedModel = document.getElementById("modelSelect").value;
+            if(!selectedModel && tomSelectInstance) selectedModel = tomSelectInstance.getValue();
+            if (!selectedModel) throw new Error("Select a Model");
+            
+            const res = await fetch(PROVIDERS[currentProvider].chat, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${document.getElementById("apiKey").value}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: selectedModel, 
+                    messages: payload,
+                    temperature: parseFloat(document.getElementById("temp")?.value || 1.0),
+                    top_p: parseFloat(document.getElementById("topP")?.value || 1.0),
+                    max_tokens: parseInt(document.getElementById("maxTokens")?.value || 4096)
+                })
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if(loading.parentNode) els.history.removeChild(loading);
+            
+            const reply = data.choices[0].message.content;
+            renderMessage('assistant', reply);
+            messages.push({role:"assistant", content:reply});
+            saveState();
+        } catch(e) {
+            if(loading.parentNode) els.history.removeChild(loading);
+            renderMessage('sys', "Error: " + e.message);
+        }
+    }
+
+    /* =========================================
+       UTILITIES
+       ========================================= */
+    function populateModelList(models) {
+        if (tomSelectInstance) tomSelectInstance.destroy();
+        const sel = document.getElementById("modelSelect");
+        sel.innerHTML = '<option value="">Search...</option>';
+
+        const options = models.map(m => ({
+            value: m.id,
+            text: m.name,
+            price: m.price // For template
+        }));
+
+        tomSelectInstance = new TomSelect(sel, {
+            options: options,
+            maxOptions: 200,
+            searchField: ['text'],
+            create: false,
+            // Custom Render to show price
+            render: {
+                option: function(data, escape) {
+                    let priceStr = data.price > 0 ? `$${(data.price).toFixed(2)}` : "";
+                    return `<div class="option"><span>${escape(data.text)}</span><span class="model-price">${priceStr}</span></div>`;
+                },
+                item: function(data, escape) {
+                    return `<div>${escape(data.text)}</div>`;
+                }
+            },
+            onChange: function() { saveState(); }
+        });
+        
+        const lastModel = localStorage.getItem("gs_selected_model_" + currentProvider);
+        if (lastModel) tomSelectInstance.setValue(lastModel, true); 
+    }
+
+    function renderMessage(role, text) {
+        if (!els.history) return;
+        const d = document.createElement("div");
+        d.className = `msg ${role === 'assistant' ? 'ai' : (role === 'user' ? 'user' : 'sys')}`;
+        if(role === 'assistant') d.innerHTML = parseMarkdown(escapeHtml(text)); 
+        else d.innerText = text;
+        els.history.appendChild(d);
+        setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 50);
+    }
+
+    function parseMarkdown(text) {
+        const codeBlocks = [];
+        text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+            const id = codeBlocks.length; 
+            codeBlocks.push({lang: lang || 'txt', code: code.trim()});
+            return `__CODE_BLOCK_${id}__`;
+        });
+        text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/`([^`]+)`/g, '<code>$1</code>');
+        return text.replace(/__CODE_BLOCK_(\d+)__/g, (match, id) => {
+            const block = codeBlocks[id];
+            return `<div class="code-box"><div class="code-header"><span>${block.lang.toUpperCase()}</span><button class="code-btn" onclick="copyToClip(this)">COPY</button></div><div class="code-content">${block.code}</div><textarea class="raw-code" style="display:none;">${block.code}</textarea></div>`;
+        });
+    }
+    function escapeHtml(text) { return text ? text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ""; }
+
+    function saveState() {
+        localStorage.setItem("gs_history", JSON.stringify(messages));
+        localStorage.setItem("gs_apikey", document.getElementById("apiKey")?.value || "");
+        localStorage.setItem("gs_sys", sysText);
+        localStorage.setItem("gs_card", cardText);
+        localStorage.setItem("gs_lorebook", JSON.stringify(lorebook));
+        // Save Boolean States
+        localStorage.setItem("gs_tools", state.tools);
+        localStorage.setItem("gs_entersend", state.enterToSend);
+        
+        if (tomSelectInstance) localStorage.setItem("gs_selected_model_" + currentProvider, tomSelectInstance.getValue());
+        saveApiKey();
+    }
+
+    window.changeProvider = function() {
+        currentProvider = document.getElementById("providerSelect").value;
+        localStorage.setItem("gs_provider", currentProvider);
+        loadApiKey();
+        const saved = localStorage.getItem("gs_models_" + currentProvider);
+        if(saved) populateModelList(JSON.parse(saved));
+        else {
+            if (tomSelectInstance) tomSelectInstance.destroy();
+            document.getElementById("modelSelect").innerHTML = '<option value="">Click Refresh ↻</option>';
+        }
+    };
+    function loadApiKey() { document.getElementById("apiKey").value = localStorage.getItem("gs_apikey_"+currentProvider) || PROVIDERS[currentProvider].defaultKey; }
+    window.saveApiKey = function() { localStorage.setItem("gs_apikey_"+currentProvider, document.getElementById("apiKey").value); }
+    window.applyPrompt = function() { sysText = PROMPTS[document.getElementById("promptSelect").value] || ""; saveState(); };
+    window.applyFontSize = function() { 
+        const s = document.getElementById("fontSize").value; 
+        document.body.style.fontSize = s+"px"; 
+        localStorage.setItem("gs_fontsize", s); 
+    };
+
+    function parsePNG(buffer) {
+        const view = new DataView(buffer); let offset = 8; const dec = new TextDecoder('utf-8'); const lat = new TextDecoder('latin1');
+        while(offset < view.byteLength) {
+            const len = view.getUint32(offset);
+            if(dec.decode(new Uint8Array(buffer, offset+4, 4)) === 'tEXt') {
+                const data = new Uint8Array(buffer, offset+8, len);
+                let idx = -1; for(let i=0;i<len;i++) if(data[i]===0) {idx=i; break;}
+                if(idx > -1 && lat.decode(data.slice(0, idx)).toLowerCase() === 'chara') {
+                     const c = lat.decode(data.slice(idx+1));
+                     return JSON.parse(c.startsWith('ew') ? atob(c) : c);
+                }
+            }
+            offset += len + 12;
+        }
+    }
+    
+    window.copyToClip = function(btn) {
+        const raw = btn.closest('.code-box').querySelector('.raw-code');
+        const t = document.createElement("textarea"); t.innerHTML = raw.value; const v = t.value;
+        const clip = document.createElement("textarea"); clip.value = v; document.body.appendChild(clip); clip.select();
+        try { document.execCommand('copy'); btn.innerText = "OK"; } catch(e) { btn.innerText = "ERR"; }
+        document.body.removeChild(clip); setTimeout(()=>btn.innerText="COPY",1000);
+    };
+
+    window.exportState = function() {
+        const state = {};
+        for(let i=0; i<localStorage.length; i++) { const k=localStorage.key(i); if(k.startsWith('gs_')) state[k]=localStorage.getItem(k); }
+        const b = new Blob([JSON.stringify(state)],{type:"application/json"});
+        const a = document.createElement("a"); a.href=URL.createObjectURL(b); a.download=`nokiamancy_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    };
+    window.importState = function(i) {
+        const r = new FileReader(); r.onload=e=>{try{const s=JSON.parse(e.target.result);Object.keys(s).forEach(k=>localStorage.setItem(k,s[k]));alert("Loaded!");location.reload();}catch(x){alert("Fail");}};
+        if(i.files[0]) r.readAsText(i.files[0]);
+    };
+    function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghetto-Hub R/W</title>
+    <style>
+        /* POTATO MODE v2.0 */
+        body { 
+            background-color: #000; 
+            color: #ccc; 
+            font-family: monospace; 
+            font-size: 14px; 
+            margin: 0; padding: 5px; 
+        }
+        
+        /* HEADER & NAV */
+        #header { border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px; }
+        .crumb { color: #888; font-size: 12px; }
+
+        /* BUTTONS */
+        button { 
+            background: #222; color: #fff; border: 1px solid #555; 
+            padding: 8px; width: 100%; margin-bottom: 5px; cursor: pointer;
+            text-transform: uppercase; font-weight: bold;
+        }
+        button:focus, .item:focus { 
+            background: #fff; color: #000; border: 2px solid #0f0; outline: none; 
+        }
+        
+        /* SPECIAL ACTIONS */
+        .btn-upload { background: #004D40; color: #00e676; border-color: #00695c; }
+        .btn-overwrite { background: #b71c1c; color: #ff8a80; border-color: #d32f2f; }
+
+        /* LIST ITEMS */
+        .item { 
+            display: block; padding: 10px 5px; 
+            border-bottom: 1px solid #222; 
+            text-decoration: none; cursor: pointer;
+        }
+        .type-dir { color: #d4d400; } 
+        .type-file { color: #0f0; } 
+        
+        /* VIEWER */
+        #viewer { display: none; white-space: pre-wrap; word-wrap: break-word; background: #111; padding: 5px; border: 1px solid #333; font-size: 12px;}
+        
+        /* INPUTS */
+        input[type="text"] { background: #000; color: #fff; border: 1px solid #333; width: 100%; padding: 5px; margin-bottom: 5px; }
+        .hidden-input { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SETUP SCREEN -->
+    <div id="setup">
+        <h3>GH MASTER LOGIN</h3>
+        <input type="text" id="ghToken" placeholder="Paste Token (ghp_...)">
+        <button onclick="saveAndStart()">LOGIN</button>
+        <div style="font-size:10px; color:#666;">(Saved to localStorage)</div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app" style="display:none;">
+        <div id="header">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                <button onclick="goHome()">[HOME]</button> 
+                <button onclick="goBack()">[BACK]</button>
+            </div>
+            <div id="breadcrumbs" class="crumb">...</div>
+            <div id="status" style="color:cyan; font-size:10px; min-height:15px;"></div>
+        </div>
+
+        <!-- ACTION BAR (Dynamic) -->
+        <div id="actionBar">
+            <!-- Hidden inputs for file handling -->
+            <input type="file" id="uploadInput" class="hidden-input" onchange="handleFileSelect(this)">
+            <button id="btnUpload" class="btn-upload" style="display:none;" onclick="triggerUpload()">[+] UPLOAD FILE HERE</button>
+            <button id="btnUpdate" class="btn-overwrite" style="display:none;" onclick="triggerUpload()">[⇪] UPDATE FROM FILE</button>
+        </div>
+
+        <div id="list"></div>
+        <pre id="viewer"></pre>
+    </div>
+
+    <script>
+        // === STATE ===
+        let currentOwner = "";
+        let currentRepo = "";
+        let currentPath = "";
+        let currentFileSha = null; // Needed to overwrite files
+        let currentView = "setup"; // setup, repos, tree, blob
+        let historyStack = [];
+
+        // === INIT ===
+        window.onload = function() {
+            if(localStorage.getItem('gh_token')) {
+                document.getElementById('ghToken').value = localStorage.getItem('gh_token');
+                startApp();
+            }
+        }
+
+        function saveAndStart() {
+            localStorage.setItem('gh_token', document.getElementById('ghToken').value);
+            startApp();
+        }
+
+        function startApp() {
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+            loadRepos();
+        }
+
+        function setStatus(msg) { document.getElementById('status').innerText = msg; }
+
+        // === NAVIGATION ===
+        function goHome() {
+            historyStack = [];
+            loadRepos();
+        }
+
+        function goBack() {
+            if(historyStack.length === 0) return goHome();
+            const prev = historyStack.pop();
+            if(prev.view === 'repos') loadRepos();
+            else if (prev.view === 'tree') loadTree(prev.owner, prev.repo, prev.path, false);
+        }
+
+        // === CORE VIEWS ===
+        
+        // 1. LIST REPOS
+        async function loadRepos() {
+            currentView = "repos";
+            currentOwner = ""; currentRepo = ""; currentPath = "";
+            updateUI("Home", false, false); // No upload buttons here
+            
+            const list = document.getElementById('list');
+            list.innerHTML = "Loading Repos...";
+
+            try {
+                const repos = await api('/user/repos?sort=updated&per_page=30');
+                list.innerHTML = "";
+                repos.forEach(repo => {
+                    createItem(list, `📁 ${repo.name}`, 'type-dir', () => {
+                        historyStack.push({view:'repos'});
+                        loadTree(repo.owner.login, repo.name, "");
+                    });
+                });
+            } catch(e) { list.innerHTML = "Error loading repos."; }
+        }
+
+        // 2. LIST FILES (TREE)
+        async function loadTree(owner, repo, path, pushHistory = true) {
+            if(pushHistory && currentRepo) historyStack.push({view:'tree', owner:currentOwner, repo:currentRepo, path:currentPath});
+            
+            currentOwner = owner; currentRepo = repo; currentPath = path;
+            currentView = "tree";
+            
+            // SHOW UPLOAD BUTTON
+            updateUI(`${repo}/${path}`, true, false); 
+
+            const list = document.getElementById('list');
+            list.innerHTML = "Loading...";
+
+            try {
+                const data = await api(`/repos/${owner}/${repo}/contents/${path}`);
+                list.innerHTML = "";
+                const items = Array.isArray(data) ? data : [data];
+                
+                // Sort folders first
+                items.sort((a, b) => (a.type === b.type ? 0 : a.type === 'dir' ? -1 : 1));
+
+                items.forEach(item => {
+                    if (item.type === 'dir') {
+                        createItem(list, `📁 ${item.name}`, 'type-dir', () => loadTree(owner, repo, item.path));
+                    } else {
+                        createItem(list, `📄 ${item.name}`, 'type-file', () => loadFile(item.url, item.path, item.sha));
+                    }
+                });
+            } catch(e) { list.innerHTML = "Empty folder or Error."; }
+        }
+
+        // 3. VIEW FILE (BLOB)
+        async function loadFile(url, path, sha) {
+            historyStack.push({view:'tree', owner:currentOwner, repo:currentRepo, path:currentPath});
+            currentPath = path; 
+            currentFileSha = sha; // IMPORTANT: Save SHA for updates
+            currentView = "blob";
+
+            // SHOW UPDATE BUTTON
+            updateUI(path, false, true);
+
+            const viewer = document.getElementById('viewer');
+            const list = document.getElementById('list');
+            list.style.display = 'none';
+            viewer.style.display = 'block';
+            viewer.innerText = "Fetching...";
+
+            try {
+                const res = await fetch(url, { headers: { "Authorization": `token ${document.getElementById
