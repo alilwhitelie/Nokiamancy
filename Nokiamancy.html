@@ -224,7 +224,7 @@
             <option value="gemini">Gemini</option>
         </select>
         <input type="password" id="apiKey" placeholder="API Key" onchange="saveApiKey()">
-
+		
         <div class="section-label">MODEL</div>
         <div class="row-flex">
             <!-- Dropdown placeholder -->
@@ -232,7 +232,16 @@
             <button id="btnRefresh" class="icon-btn" onclick="refreshModels()" tabindex="0" style="flex:0 0 32px;">↻</button>
         </div>
         <div id="modelStatus" style="font-size:0.8em; color:#666; text-align:right;">Ready</div>
-
+	<div class="section-label">CLOUD SYNC (Airtable)</div>
+	<input type="text" id="atBase" placeholder="Base ID (app...)" onchange="saveCreds()">
+	<input type="password" id="atToken" placeholder="Token (pat...)" onchange="saveCreds()">
+	<div class="row-flex">
+	    <button onclick="syncFromCloud()" style="background:#006064; width:100%">☁️ LOAD HISTORY</button>
+	</div>
+	<div style="font-size:10px; color:#666;">
+	    Requires Table: <b>ChatLog</b><br>
+	    Cols: <b>Role</b> (Text), <b>Content</b> (Long Text), <b>Timestamp</b> (Number)
+	</div>
         <div class="section-label">ADVANCED</div>
         <div class="row-grid-3">
             <div><label style="font-size:0.7em; color:#888;">TEMP</label><input  id="temp" value="1.0" onchange="saveState()"></div>
