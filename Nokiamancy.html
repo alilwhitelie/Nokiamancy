@@ -305,11 +305,11 @@
         openai: { name: "ChatGPT", chat: "https://api.openai.com/v1/chat/completions", models: "https://api.openai.com/v1/models" },
         // Added this back for you:
         gemini: { 
-            name: "Gemini", 
-            // Google's OpenAI-compatible endpoint (Easy mode)
-            chat: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", 
-            models: "https://generativelanguage.googleapis.com/v1beta/openai/models" 
-        }
+    name: "Gemini", 
+    chat: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", 
+    models: "https://generativelanguage.googleapis.com/v1beta/openai/models",
+    authType: "key" // Custom flag to handle Gemini differently
+		}	
     };
 
     let els = {}; 
@@ -554,41 +554,64 @@
         refreshModels();
     };
 
-    window.refreshModels = async function() {
-        if(els.status) els.status.innerText = "Fetching Models...";
-        try {
-            const res = await fetch(PROVIDERS[currentProvider].models, { 
-                headers: { "Authorization": `Bearer ${els.apiKey.value}` } 
-            });
-            const data = await res.json();
-            
-            // Normalize
-            let models = [];
-            if(Array.isArray(data.data)) models = data.data; // Standard
-            else if(Array.isArray(data)) models = data;
-            
-            models = models.sort((a,b) => a.id.localeCompare(b.id));
-            
-            // Re-Init TomSelect
-            if(tomSelectInstance) tomSelectInstance.destroy();
-            const sel = document.getElementById("modelSelect");
-            sel.innerHTML = "";
-            
-            const options = models.map(m => ({value: m.id, text: m.name || m.id}));
-            tomSelectInstance = new TomSelect(sel, {
-                options: options, maxOptions: 200, create: false,
-                render: { 
-                    option: (d,e) => `<div>${e(d.text)}</div>`, 
-                    item: (d,e) => `<div>${e(d.text)}</div>` 
-                },
-                onChange: () => saveState()
-            });
+window.refreshModels = async function() {
+    if(els.status) els.status.innerText = "Fetching Models...";
+    try {
+        const provider = PROVIDERS[currentProvider];
+        let headers = {};
+        
+        // Handle Gemini's different auth format
+        if(currentProvider === "gemini") {
+            headers["x-goog-api-key"] = els.apiKey.value;
+        } else {
+            headers["Authorization"] = `Bearer ${els.apiKey.value}`;
+        }
+        
+        const res = await fetch(provider.models, { headers });
+        const data = await res.json();
+        
+        // Gemini returns data differently - it might be paginated
+        let models = [];
+        if(Array.isArray(data.data)) models = data.data;
+        else if(Array.isArray(data)) models = data;
+        else if(data.data && Array.isArray(data.data)) models = data.data;
+        
+        // Filter out non-chat models for Gemini
+        if(currentProvider === "gemini") {
+            models = models.filter(m => 
+                m.id.includes("gemini") && 
+                (m.id.includes("-chat") || m.id.includes("-pro") || !m.id.includes("-"))
+            );
+        }
+        
+        models = models.sort((a,b) => a.id.localeCompare(b.id));
+        
+        // Re-Init TomSelect
+        if(tomSelectInstance) tomSelectInstance.destroy();
+        const sel = document.getElementById("modelSelect");
+        sel.innerHTML = '';
+        
+        const options = models.map(m => ({value: m.id, text: m.name || m.id}));
+        tomSelectInstance = new TomSelect(sel, {
+            options: options, 
+            maxOptions: 200, 
+            create: false,
+            render: { 
+                option: (d,e) => `<div>${e(d.text)}</div>`, 
+                item: (d,e) => `<div>${e(d.text)}</div>` 
+            },
+            onChange: () => saveState()
+        });
 
-            if(els.status) els.status.innerText = `Loaded ${models.length}`;
-            localStorage.setItem("gs_models_" + currentProvider, JSON.stringify(models)); // Cache
+        if(els.status) els.status.innerText = `Loaded ${models.length}`;
+        localStorage.setItem("gs_models_" + currentProvider, JSON.stringify(models));
 
-        } catch(e) { if(els.status) els.status.innerText = "Model Fetch Error"; }
-    };
+    } catch(e) { 
+        console.error("Model fetch error:", e);
+        if(els.status) els.status.innerText = "Model Fetch Error"; 
+    }
+};
+
 
     function initModelSelect() {
         // Load cached if available
