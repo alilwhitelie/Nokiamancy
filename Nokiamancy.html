@@ -292,130 +292,171 @@
 
 <script>
     /** 
-     * NOKIAMANCY v0.9 (The Prisoner Edition) 
-     * Features: Airtable Sync, Code Downloader, Flip-Optimized
+     * NOKIAMANCY v0.9b (FIXED)
+     * - Restored UI & AI Logic
+     * - Added Airtable Sync & Code Save
      */
 
-    // --- CONSTANTS ---
+    // --- 1. CONFIG & STATE ---
     const PROVIDERS = {
         openrouter: { name: "OpenRouter", chat: "https://openrouter.ai/api/v1/chat/completions", models: "https://openrouter.ai/api/v1/models" },
         zai: { name: "zAI", chat: "https://api.z.ai/api/coding/paas/v4/chat/completions", models: "https://api.z.ai/api/coding/paas/v4/models" },
-        nanogpt: { name: "NanoGPT", chat: "https://nano-gpt.com/api/v1/chat/completions", models: "https://nano-gpt.com/api/v1/models" }
+        nanogpt: { name: "NanoGPT", chat: "https://nano-gpt.com/api/v1/chat/completions", models: "https://nano-gpt.com/api/v1/models" },
+        openai: { name: "ChatGPT", chat: "https://api.openai.com/v1/chat/completions", models: "https://api.openai.com/v1/models" }
     };
 
-    // --- STATE ---
     let els = {}; 
     let messages = [], currentGreetings = [], currentGreetingIdx = 0;
     let tomSelectInstance = null;
     let state = { tools: false, enterToSend: true };
     let sysText = "", cardText = "", lorebook = [];
-    
-    // --- AIRTABLE CONFIG ---
+    let currentProvider = "openrouter";
+    let activeEditorTarget = ""; // 'sys' or 'card'
+
+    // Airtable Config (The new stuff)
     let airtableConfig = {
-        baseId: localStorage.getItem("nk_at_base") || "",
-        token: localStorage.getItem("nk_at_token") || "",
-        tableName: "ChatLog",  // Table 1: For messages
-        configTable: "Config"  // Table 2: For settings (Row 1)
+        baseId: "",
+        token: "",
+        tableName: "ChatLog"
     };
 
-    // --- INITIALIZATION ---
+    // --- 2. INITIALIZATION ---
     window.onload = function() {
-        // Cache DOM elements
         els = {
             input: document.getElementById("userInput"), 
             history: document.getElementById("history"),
-            status: document.getElementById("modelStatus"),
             settings: document.getElementById("settingsPane"),
-            // Cloud Inputs (You need to add these to your HTML HTML, see below script!)
-            atBase: document.getElementById("atBase"),
+            status: document.getElementById("modelStatus"),
+            apiKey: document.getElementById("apiKey"),
+            provider: document.getElementById("providerSelect"),
+            // Cloud Inputs (Ensure these exist in your HTML!)
+            atBase: document.getElementById("atBase"), 
             atToken: document.getElementById("atToken")
         };
+
+        // Load Font & UI Config
+        const fs = localStorage.getItem("gs_fontsize") || "12";
+        document.body.style.fontSize = fs + "px"; 
+        if(document.getElementById("fontSize")) document.getElementById("fontSize").value = fs;
         
-        loadLocalSettings();
-        if(messages.length === 0) renderSysMsg("System Ready (Local). Check Cloud Config.");
+        state.tools = (localStorage.getItem("gs_tools") === "true");
+        state.enterToSend = (localStorage.getItem("gs_entersend") !== "false");
+        updateToggleUI('tools'); updateToggleUI('enter');
+
+        // Load Data
+        sysText = localStorage.getItem("gs_sys") || "You are helpful.";
+        cardText = localStorage.getItem("gs_card") || "";
+        currentProvider = localStorage.getItem("gs_provider") || "openrouter";
+        if(els.provider) els.provider.value = currentProvider;
+        
+        // Load Airtable Creds
+        airtableConfig.baseId = localStorage.getItem("nk_at_base") || "";
+        airtableConfig.token = localStorage.getItem("nk_at_token") || "";
+        if(els.atBase) els.atBase.value = airtableConfig.baseId;
+        if(els.atToken) els.atToken.value = airtableConfig.token;
+
+        loadApiKey();
+        loadHistory();
+        initModelSelect();
+
+        // Keyboard Handler
+        if(els.input) {
+            els.input.addEventListener("keydown", (e) => {
+                if(e.key === "Enter" && !e.shiftKey && state.enterToSend) { e.preventDefault(); sendMessage(); }
+            });
+        }
     };
 
-    // --- CORE MESSAGING ---
-    async function sendMessage() {
-        const text = els.input.value.trim();
-        if(!text) return;
-        
-        els.input.value = ""; 
-        autoResize(els.input);
+    // --- 3. UI FUNCTIONS (The stuff I deleted by accident) ---
+    window.toggleSettings = () => {
+        const p = els.settings || document.getElementById("settingsPane");
+        if(p) {
+            p.style.display = p.style.display === "block" ? "none" : "block";
+            if(p.style.display === "block") window.scrollTo(0, document.body.scrollHeight);
+        }
+    };
 
-        // 1. Render & Save User Msg
-        renderMessage("user", text);
-        const userMsgObj = {role: "user", content: text, timestamp: Date.now()};
-        messages.push(userMsgObj);
-        
-        // 2. Cloud Append (Fire and Forget)
-        if(canSync()) uploadToAirtable(userMsgObj);
+    window.toggleBoolean = function(key) {
+        state[key] = !state[key];
+        updateToggleUI(key);
+        saveState();
+    };
 
-        // 3. Prepare AI Payload
-        renderSysMsg("Thinking...");
-        try {
-            const reply = await callAI(text); // Abstracted AI call
-            removeLastSysMsg();
-            
-            // 4. Render & Save AI Msg
-            renderMessage("assistant", reply);
-            const aiMsgObj = {role: "assistant", content: reply, timestamp: Date.now()};
-            messages.push(aiMsgObj);
-
-            // 5. Cloud Append
-            if(canSync()) uploadToAirtable(aiMsgObj);
-            
-            saveState(); // Local backup
-        } catch(e) {
-            removeLastSysMsg();
-            renderSysMsg("Error: " + e.message);
+    function updateToggleUI(key) {
+        const btn = document.getElementById(key === 'tools' ? 'btnTools' : 'btnEnter');
+        const icon = document.getElementById(key === 'tools' ? 'iconTools' : 'iconEnter');
+        if(btn && icon) {
+            if(state[key]) { btn.classList.add('active'); icon.innerText = "check_box"; } 
+            else { btn.classList.remove('active'); icon.innerText = "check_box_outline_blank"; }
         }
     }
 
-    // --- AIRTABLE LOGIC (The New Stuff) ---
-    
+    window.applyFontSize = function() {
+        const s = document.getElementById("fontSize").value;
+        document.body.style.fontSize = s + "px";
+        localStorage.setItem("gs_fontsize", s);
+    };
+
+    // --- 4. EDITOR LOGIC ---
+    window.openEditor = function(target) {
+        activeEditorTarget = target;
+        document.getElementById("editorTitle").innerText = target === 'sys' ? "SYSTEM" : "CARD DATA";
+        document.getElementById("editorContent").value = target === 'sys' ? sysText : cardText;
+        document.getElementById("editorOverlay").style.display = "flex";
+    };
+
+    window.closeEditor = function() {
+        const val = document.getElementById("editorContent").value;
+        if(activeEditorTarget === 'sys') sysText = val;
+        else { cardText = val; document.getElementById("cardStatus").innerText = val ? "Card Loaded" : "No Card"; }
+        saveState();
+        document.getElementById("editorOverlay").style.display = "none";
+    };
+
+    // --- 5. AIRTABLE SYNC (Restored) ---
     function canSync() { return airtableConfig.baseId && airtableConfig.token; }
 
-    // APPEND ONLY (Uses minimal data)
+    window.saveCreds = function() {
+        airtableConfig.baseId = document.getElementById("atBase").value;
+        airtableConfig.token = document.getElementById("atToken").value;
+        localStorage.setItem("nk_at_base", airtableConfig.baseId);
+        localStorage.setItem("nk_at_token", airtableConfig.token);
+        alert("Keys Saved!");
+    };
+
     async function uploadToAirtable(msgObj) {
         const url = `https://api.airtable.com/v0/${airtableConfig.baseId}/${airtableConfig.tableName}`;
         try {
             await fetch(url, {
                 method: "POST",
-                headers: { 
-                    "Authorization": `Bearer ${airtableConfig.token}`,
-                    "Content-Type": "application/json"
-                },
+                headers: { "Authorization": `Bearer ${airtableConfig.token}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    records: [{ fields: {
-                        Role: msgObj.role,
-                        Content: msgObj.content,
-                        Timestamp: msgObj.timestamp
-                    }}]
+                    records: [{ fields: { Role: msgObj.role, Content: msgObj.content, Timestamp: msgObj.timestamp || Date.now() } }]
                 })
             });
-            document.getElementById("btnCloud").style.color = "#00e676"; // Green Flash
-            setTimeout(()=>document.getElementById("btnCloud").style.color = "", 1000);
+            // Visual feedback on Load Button
+            const btn = document.querySelector('button[onclick="syncFromCloud()"]');
+            if(btn) btn.innerText = "☁️ SAVED";
+            setTimeout(()=> { if(btn) btn.innerText = "☁️ LOAD HISTORY"; }, 2000);
         } catch(e) { console.error("Cloud Write Fail", e); }
     }
 
-    // SYNC DOWN (Low Memory Mode: Max 20 Records)
     window.syncFromCloud = async function() {
-        if(!canSync()) { alert("Missing Airtable Base ID or Token!"); return; }
-        
+        if(!canSync()) { alert("Missing Cloud Keys in Settings"); return; }
         renderSysMsg("Syncing from Cloud...");
+        
+        // Low Mem Mode: 20 records
         const url = `https://api.airtable.com/v0/${airtableConfig.baseId}/${airtableConfig.tableName}?maxRecords=20&sort[0][field]=Timestamp&sort[0][direction]=desc`;
         
         try {
             const res = await fetch(url, { headers: {"Authorization": `Bearer ${airtableConfig.token}`} });
+            if(!res.ok) throw new Error("Airtable Error");
+            
             const data = await res.json();
+            const rows = data.records.reverse(); // Oldest first
             
-            // Airtable gives newest first (due to sort), reverse to restore convo order
-            const rows = data.records.reverse(); 
-            
-            // Clear current memory/screen
             messages = [];
-            els.history.innerHTML = "";
+            if(els.history) els.history.innerHTML = "";
             
             rows.forEach(r => {
                 const m = { role: r.fields.Role, content: r.fields.Content };
@@ -423,114 +464,218 @@
                 renderMessage(m.role, m.content);
             });
             
-            renderSysMsg("Synced.");
+            renderSysMsg("Sync Complete.");
+            saveState();
+        } catch(e) { renderSysMsg("Sync Fail: " + e.message); }
+    };
+
+    // --- 6. CORE MESSAGING ---
+    async function sendMessage() {
+        const text = els.input.value.trim();
+        if(!text) return;
+        els.input.value = ""; 
+        autoResize(els.input);
+
+        // User
+        renderMessage("user", text);
+        const uMsg = { role: "user", content: text, timestamp: Date.now() };
+        messages.push(uMsg);
+        if(canSync()) uploadToAirtable(uMsg);
+
+        // AI
+        renderSysMsg("Thinking...");
+        try {
+            const reply = await callAI(text);
+            removeLastSysMsg();
+            
+            renderMessage("assistant", reply);
+            const aMsg = { role: "assistant", content: reply, timestamp: Date.now() };
+            messages.push(aMsg);
+            if(canSync()) uploadToAirtable(aMsg);
+            
             saveState();
         } catch(e) {
-            renderSysMsg("Sync Failed: " + e.message);
+            removeLastSysMsg();
+            renderSysMsg("Error: " + e.message);
         }
-    };
-    
-    // --- UTILS ---
+    }
 
-    // The Fix for Code Downloading (Flip Phone Support)
+    async function callAI(lastInput) {
+        if(!els.apiKey.value) throw new Error("Missing API Key");
+        
+        const provData = PROVIDERS[currentProvider];
+        let selectedModel = "";
+        if(tomSelectInstance) selectedModel = tomSelectInstance.getValue();
+        if(!selectedModel && document.getElementById("modelSelect")) selectedModel = document.getElementById("modelSelect").value;
+        if(!selectedModel) selectedModel = "openai/gpt-3.5-turbo"; // Fallback
+
+        // Payload
+        let finalSys = sysText;
+        if(cardText) finalSys += "\n\n" + cardText;
+        const msgPayload = [{role:"system", content:finalSys}, ...messages];
+        
+        // Settings
+        const temp = parseFloat(document.getElementById("temp")?.value || 0.7);
+        const topP = parseFloat(document.getElementById("topP")?.value || 1.0);
+        const maxTokens = parseInt(document.getElementById("maxTokens")?.value || 2000);
+
+        const res = await fetch(provData.chat, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${els.apiKey.value}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: selectedModel,
+                messages: msgPayload,
+                temperature: temp,
+                top_p: topP,
+                max_tokens: maxTokens
+            })
+        });
+
+        if(!res.ok) {
+             const errTxt = await res.text();
+             throw new Error(errTxt || res.statusText);
+        }
+        const data = await res.json();
+        return data.choices[0].message.content;
+    }
+
+    // --- 7. PROVIDER & MODELS ---
+    window.changeProvider = function() {
+        currentProvider = els.provider.value;
+        localStorage.setItem("gs_provider", currentProvider);
+        loadApiKey();
+        refreshModels();
+    };
+
+    window.refreshModels = async function() {
+        if(els.status) els.status.innerText = "Fetching Models...";
+        try {
+            const res = await fetch(PROVIDERS[currentProvider].models, { 
+                headers: { "Authorization": `Bearer ${els.apiKey.value}` } 
+            });
+            const data = await res.json();
+            
+            // Normalize
+            let models = [];
+            if(Array.isArray(data.data)) models = data.data; // Standard
+            else if(Array.isArray(data)) models = data;
+            
+            models = models.sort((a,b) => a.id.localeCompare(b.id));
+            
+            // Re-Init TomSelect
+            if(tomSelectInstance) tomSelectInstance.destroy();
+            const sel = document.getElementById("modelSelect");
+            sel.innerHTML = "";
+            
+            const options = models.map(m => ({value: m.id, text: m.name || m.id}));
+            tomSelectInstance = new TomSelect(sel, {
+                options: options, maxOptions: 200, create: false,
+                render: { 
+                    option: (d,e) => `<div>${e(d.text)}</div>`, 
+                    item: (d,e) => `<div>${e(d.text)}</div>` 
+                },
+                onChange: () => saveState()
+            });
+
+            if(els.status) els.status.innerText = `Loaded ${models.length}`;
+            localStorage.setItem("gs_models_" + currentProvider, JSON.stringify(models)); // Cache
+
+        } catch(e) { if(els.status) els.status.innerText = "Model Fetch Error"; }
+    };
+
+    function initModelSelect() {
+        // Load cached if available
+        const saved = localStorage.getItem("gs_models_" + currentProvider);
+        if(saved) {
+             // Rebuild UI with cached data logic... simplified here for stability
+             // Ideally you trigger refresh if cache is old, but let's just wait for user to click refresh
+             if(document.getElementById("modelSelect")) document.getElementById("modelSelect").innerHTML = "<option>Click Refresh ↻</option>";
+        }
+    }
+
+    // --- 8. UTILS & DISPLAY ---
+    function renderMessage(role, text) {
+        if(!els.history) return;
+        const d = document.createElement("div");
+        d.className = `msg ${role === 'assistant' ? 'ai' : (role === 'user' ? 'user' : 'sys')}`;
+        d.innerHTML = role === 'assistant' ? parseMarkdown(text) : text.replace(/\n/g,'<br>');
+        els.history.appendChild(d);
+        setTimeout(()=>window.scrollTo(0, document.body.scrollHeight),50);
+    }
+    
+    function renderSysMsg(text) {
+        const d = document.createElement("div"); d.className = "msg sys";
+        d.innerHTML = text;
+        els.history.appendChild(d);
+    }
+
+    function removeLastSysMsg() {
+        const msgs = els.history.querySelectorAll(".sys");
+        if(msgs.length > 0) msgs[msgs.length - 1].remove();
+    }
+
+    // Markdown Parser with FILE SAVE Button (The Deployment Feature)
     function parseMarkdown(text) {
         const blocks = [];
         text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, l, c) => {
             blocks.push({l:l||'txt', c:c.trim()});
-            return `__B${blocks.length-1}__`;
+            return `__BLK${blocks.length-1}__`;
         });
         
-        // Formats
-        text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-                   .replace(/`([^`]+)`/g, '<code style="background:#222;padding:2px;">$1</code>');
-                   
-        // Restore blocks with DOWNLOAD button
-        return text.replace(/__B(\d+)__/g, (m, id) => {
+        text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+        
+        return text.replace(/__BLK(\d+)__/g, (m, id) => {
             const b = blocks[id];
-            const safeCode = encodeURIComponent(b.c); // Safe for onClick
-            return `<div class="code-box" style="margin:5px 0; border:1px solid #444; background:#111;">
-                <div style="background:#222; padding:4px; display:flex; justify-content:space-between; font-size:10px;">
+            const safeCode = encodeURIComponent(b.c);
+            return `<div class="code-box">
+                <div class="code-header">
                     <span>${b.l.toUpperCase()}</span>
                     <div>
-                        <button onclick="doCopy('${safeCode}')">COPY</button>
-                        <button style="color:#0f0;" onclick="doDownload('${safeCode}', '${b.l}')">SAVE</button>
+                        <button class="code-btn" onclick="copyC('${safeCode}')">COPY</button>
+                        <button class="code-btn" style="color:#0f0;" onclick="downC('${safeCode}','${b.l}')">💾 SAVE</button>
                     </div>
                 </div>
-                <div style="padding:5px; white-space:pre-wrap; overflow-x:auto; font-family:monospace; color:#ccc;">${b.c.replace(/</g,'&lt;')}</div>
+                <div class="code-content">${b.c.replace(/</g,"&lt;")}</div>
             </div>`;
         });
     }
 
-    // Helper Functions to support the above HTML
-    window.doCopy = (c) => { navigator.clipboard.writeText(decodeURIComponent(c)); };
-    window.doDownload = (c, ext) => {
-        const name = prompt("Filename:", `code.${ext}`);
-        if(name) {
-            const b = new Blob([decodeURIComponent(c)], {type:'text/plain'});
+    // Global exposed helpers for onClick events
+    window.copyC = (c) => navigator.clipboard.writeText(decodeURIComponent(c));
+    window.downC = (c, ext) => {
+        const n = prompt("Save as:", `script.${ext}`);
+        if(n) {
+            const blob = new Blob([decodeURIComponent(c)], {type:"text/plain"});
+            const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = URL.createObjectURL(b); a.download = name; a.click();
+            a.href = url; a.download = n; a.click();
         }
     };
 
-    function renderMessage(role, text) {
-        const d = document.createElement("div");
-        d.className = `msg ${role}`;
-        d.innerHTML = role === 'assistant' ? parseMarkdown(text) : text.replace(/\n/g,'<br>');
-        els.history.appendChild(d);
-        window.scrollTo(0, document.body.scrollHeight);
+    function loadApiKey() { 
+        els.apiKey.value = localStorage.getItem("gs_apikey_" + currentProvider) || PROVIDERS[currentProvider].defaultKey || ""; 
     }
+    window.saveApiKey = function() { localStorage.setItem("gs_apikey_" + currentProvider, els.apiKey.value); }
     
-    function renderSysMsg(text) {
-        const d = document.createElement("div"); d.className = "msg sys"; 
-        d.innerHTML = `<em>${text}</em>`;
-        els.history.appendChild(d);
+    function loadHistory() {
+        // Logic to restore 'messages' from localstorage if not using cloud
+        const loc = localStorage.getItem("gs_history");
+        if(loc) {
+            try { 
+                const h = JSON.parse(loc);
+                h.forEach(m => { messages.push(m); if(m.role!=='system') renderMessage(m.role, m.content); });
+            } catch(e){}
+        }
     }
-    
-    function removeLastSysMsg() {
-        const sys = els.history.querySelectorAll(".sys");
-        if(sys.length) sys[sys.length-1].remove();
-    }
-    
+
     function saveState() {
-        // Save Config Locally
-        localStorage.setItem("nk_at_base", airtableConfig.baseId);
-        localStorage.setItem("nk_at_token", airtableConfig.token);
-        // ... (keep your existing local save logic if you want)
+        localStorage.setItem("gs_history", JSON.stringify(messages));
+        // Save boolean toggles too
+        localStorage.setItem("gs_tools", state.tools);
+        localStorage.setItem("gs_entersend", state.enterToSend);
     }
     
-    function loadLocalSettings() {
-        // Just ensures variables are ready
-    }
-
-    function autoResize(el) { el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
-    
-    // --- AI LOGIC (Simulated for Brevity - Connect your inputs here) ---
-    async function callAI(prompt) {
-        const apiKey = document.getElementById("apiKey").value; // Needs to exist in HTML
-        const provider = document.getElementById("providerSelect").value;
-        const url = PROVIDERS[provider].chat;
-        const model = localStorage.getItem("nk_model"); 
-        
-        const req = await fetch(url, {
-            method:"POST",
-            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: model,
-                messages: [{role:"system", content: sysText || "You are helpful."}, ...messages],
-                max_tokens: 1000
-            })
-        });
-        const data = await req.json();
-        return data.choices[0].message.content;
-    }
-
-    // Save Creds from Inputs
-    window.saveCreds = function() {
-        airtableConfig.baseId = document.getElementById("atBase").value;
-        airtableConfig.token = document.getElementById("atToken").value;
-        saveState();
-        alert("Keys Saved locally!");
-    }
+    function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 </script>
 </body>
 </html>
