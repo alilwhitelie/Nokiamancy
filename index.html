@@ -39,8 +39,16 @@
             gap: 1rem;
         }
 
-        a {
-            display: block;
+        /* New styles for the container holding the link and button */
+        .link-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem; /* Space between the main link and the button */
+        }
+
+        /* Style for the main navigation link */
+        .nav-link {
+            flex-grow: 1; /* Takes up all available space */
             padding: 1rem;
             text-decoration: none;
             color: #0969da;
@@ -49,13 +57,42 @@
             border-radius: 6px;
             font-weight: 600;
             transition: all 0.2s ease;
+            text-align: left; /* Keep text aligned properly */
         }
-
-        a:hover {
+        
+        .nav-link:hover {
             background-color: #0969da;
             color: white;
             border-color: #0969da;
             transform: translateY(-2px);
+        }
+
+        /* Style for the download button/link */
+        .download-link {
+            width: 44px; /* Fixed size for the button */
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            background-color: #e8e8e8; /* Slightly darker background */
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            color: #333;
+            transition: all 0.2s ease;
+            flex-shrink: 0; /* Prevents it from shrinking */
+        }
+        
+        .download-link:hover {
+            background-color: #0969da;
+            color: white;
+            border-color: #0969da;
+            transform: translateY(-2px);
+        }
+
+        .download-link svg {
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
@@ -64,8 +101,27 @@
     <div class="container">
         <h1>My Projects</h1>
         <div class="link-list">
-            <a href="Nokiamancy.html">Nokiamancy</a>
-            <a href="gh_master.html">GH Master</a>
+            <div class="link-item">
+                <a href="Nokiamancy.html" class="nav-link">Nokiamancy</a>
+                <a href="Nokiamancy.html" download="Nokiamancy.html" class="download-link" title="Download Nokiamancy.html">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </a>
+            </div>
+
+            <div class="link-item">
+                <a href="gh_master.html" class="nav-link">GH Master</a>
+                <a href="gh_master.html" download="gh_master.html" class="download-link" title="Download gh_master.html">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </a>
+            </div>
         </div>
     </div>
 
