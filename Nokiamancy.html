@@ -1,15 +1,15 @@
 <!-- 
-    NOKIAMANCY v0.8c
+    NOKIAMANCY v0.9a
     - Single File AI Chat Interface
     - Optimized for KaiOS / Mobile / Retro configurations
-    - UPDATES: Fixed Scaling, Toggle Buttons, Modal Dropdowns, Pricing Display
+    - UPDATES: Version 0.9a Release
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nokiamancy v0.8c</title>
+    <title>Nokiamancy v0.9a</title>
     
     <!-- External Dependencies: Icons and Select Library -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -30,13 +30,13 @@
             --success: #03dac6;
         }
         
-        body { 
-            background-color: var(--bg); 
-            color: var(--text); 
-            font-family: Roboto, sans-serif; 
-            margin: 0; padding: 4px;
-            /* Base font size set via JS, default 12px */
-            font-size: 12px; 
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: Roboto, sans-serif;
+            margin: 0; padding: 0.25rem;
+            /* Base font size set via JS, default 12px = 0.75rem */
+            font-size: 0.75rem;
         }
 
         /* =========================================
@@ -44,100 +44,100 @@
            ========================================= */
         
         /* GREETING BOX */
-        #greetingContainer { 
-            background: #1a1a1a; padding: 5px; 
-            border-bottom: 1px solid var(--accent); 
-            display: none; 
+        #greetingContainer {
+            background: #1a1a1a; padding: 0.3125rem;
+            border-bottom: 1px solid var(--accent);
+            display: none;
         }
-        #greetNav { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #444; }
+        #greetNav { display: flex; justify-content: space-between; margin-bottom: 0.3125rem; border-bottom: 1px solid #444; }
         
         /* CHAT HISTORY */
-        #history { padding: 5px; scroll-behavior: smooth; padding-bottom: 20px; }
-        .msg { margin-bottom: 8px; padding: 6px 8px; border-radius: 4px; line-height: 1.3; word-wrap: break-word; max-width: 98%; }
+        #history { padding: 0.3125rem; scroll-behavior: smooth; padding-bottom: 1.25rem; }
+        .msg { margin-bottom: 0.5rem; padding: 0.375rem 0.5rem; border-radius: 0.25rem; line-height: 1.3; word-wrap: break-word; max-width: 98%; }
         .msg.user { background: #2a2a2a; color: var(--accent); align-self: flex-end; margin-left: auto; border-bottom: 1px solid var(--accent); }
         .msg.ai { background: #0d0d0d; color: var(--text); border-left: 2px solid #444; }
-        .msg.sys { font-size: 0.9em; color: #666; text-align: center; font-style: italic; }
+        .msg.sys { font-size: 0.9rem; color: #666; text-align: center; font-style: italic; }
 
         /* FOOTER & CONTROLS */
-        #footer { background: var(--surface); border-top: 1px solid var(--border); padding: 4px; margin-top: 8px; }
+        #footer { background: var(--surface); border-top: 1px solid var(--border); padding: 0.25rem; margin-top: 0.5rem; }
         #controls { display: block; }
-        
-        /* 
-           BUTTON ROW SCALING 
+
+        /*
+           BUTTON ROW SCALING
            User Request: 1.5x the size of the UI scale.
         */
-        #buttonRow { 
-            display: flex; 
-            justify-content: space-between; 
-            gap: 4px; 
-            margin-top: 4px; 
-            font-size: 1.5em; /* 1.5x current font size */
+        #buttonRow {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.25rem;
+            margin-top: 0.25rem;
+            font-size: 1.5rem; /* 1.5x current font size */
         }
         .material-icons {
-            font-size: 1em;
+            font-size: 1rem;
             vertical-align: middle;
-            }
+        }
 
         /* INPUTS */
-        textarea, input, select { 
-            background: #000; color: white; border: 1px solid var(--border); 
-            padding: 4px 6px; box-sizing: border-box; font-size: 1em; 
-            border-radius: 2px; margin-bottom: 4px; width: 100%;
+        textarea, input, select {
+            background: #000; color: white; border: 1px solid var(--border);
+            padding: 0.25rem 0.375rem; box-sizing: border-box; font-size: 1rem;
+            border-radius: 0.125rem; margin-bottom: 0.25rem; width: 100%;
         }
-        textarea.chat-input { min-height: 35px; max-height: 120px; resize: none; width: 100%; font-size: 1em; }
+        textarea.chat-input { min-height: 2.1875rem; max-height: 7.5rem; resize: none; width: 100%; font-size: 1rem; }
         
         /* BUTTONS */
-        button { 
-            background: #1e1e1e; color: white; border: 1px solid var(--border); 
-            padding: 2px; cursor: pointer; font-weight: bold; font-size: 1em; 
-            border-radius: 2px; text-transform: uppercase;
+        button {
+            background: #1e1e1e; color: white; border: 1px solid var(--border);
+            padding: 0.125rem; cursor: pointer; font-weight: bold; font-size: 1rem;
+            border-radius: 0.125rem; text-transform: uppercase;
         }
         button:focus { background: var(--accent); color: black; outline: none; }
-        
-        /* Icon Buttons in the footer inherit the 1.5em size from #buttonRow */
+
+        /* Icon Buttons in the footer inherit the 1.5rem size from #buttonRow */
         .icon-btn { flex: 1; display: flex; justify-content: center; align-items: center; }
         #btnSend { background: var(--accent); color: black; flex-grow: 2; }
 
         /* TOGGLE BUTTONS (Replacing Checkboxes for KaiOS) */
         .toggle-btn {
             background: #1a1a1a; color: #666; width: 100%;
-            border: 1px solid #333; margin-top: 2px;
+            border: 1px solid #333; margin-top: 0.125rem;
             align-items: center;
-            padding: 1px 2px;
-            font-size:1em;
+            padding: 0.0625rem 0.125rem;
+            font-size: 1rem;
         }
         .toggle-btn.active {
             background: #004D40; color: #03dac6; border-color: #03dac6;
         }
 
         /* SETTINGS DRAWER */
-        #settingsPane { display: none; background: var(--surface); border-top: 1px solid var(--accent); padding: 8px; }
-        .section-label { color: var(--accent); font-weight: bold; font-size: 0.9em; margin-top: 8px; border-bottom: 1px solid #333; }
-        .row-flex { display: flex; gap: 4px; align-items: center; }
-        .row-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+        #settingsPane { display: none; background: var(--surface); border-top: 1px solid var(--accent); padding: 0.5rem; }
+        .section-label { color: var(--accent); font-weight: bold; font-size: 0.9rem; margin-top: 0.5rem; border-bottom: 1px solid #333; }
+        .row-flex { display: flex; gap: 0.25rem; align-items: center; }
+        .row-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem; }
 
         /* OVERLAYS */
         .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 100; flex-direction: column; }
-        .overlay-header { display: flex; justify-content: space-between; padding: 8px; background: var(--surface); }
-        .overlay-body { flex: 1; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; }
+        .overlay-header { display: flex; justify-content: space-between; padding: 0.5rem; background: var(--surface); }
+        .overlay-body { flex: 1; padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; }
         .full-text-editor { flex: 1; background: #111; color: var(--text); border: 1px solid var(--border); font-family: monospace; }
-        
+
         /* MODAL */
         #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 200; justify-content: center; align-items: center; }
-        .modal-box { background: var(--surface); border: 2px solid var(--accent); padding: 20px; width: 85%; text-align: center; border-radius: 8px; }
-        .modal-btn { width: 40%; margin: 5px; padding: 10px; min-height: 48px; }
+        .modal-box { background: var(--surface); border: 2px solid var(--accent); padding: 1.25rem; width: 85%; text-align: center; border-radius: 0.5rem; }
+        .modal-btn { width: 40%; margin: 0.3125rem; padding: 0.625rem; min-height: 3rem; }
 
         /* CODE BLOCKS */
-        .code-box { background: #111; border: 1px solid #333; margin: 5px 0; font-family: monospace; }
-        .code-header { background: #222; padding: 2px 5px; display: flex; justify-content: space-between; font-size: 0.8em; color: #888; }
-        .code-content { padding: 5px; font-size: 0.9em; white-space: pre-wrap; overflow-x: auto; color: #ccc; }
+        .code-box { background: #111; border: 1px solid #333; margin: 0.3125rem 0; font-family: monospace; }
+        .code-header { background: #222; padding: 0.125rem 0.3125rem; display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; }
+        .code-content { padding: 0.3125rem; font-size: 0.9rem; white-space: pre-wrap; overflow-x: auto; color: #ccc; }
 
         /* =========================================
            TOM SELECT OVERRIDES (Fixed Modal Style)
            ========================================= */
-        .ts-control { background: #000 !important; border-color: var(--border) !important; color: var(--text) !important; min-height: 32px; }
+        .ts-control { background: #000 !important; border-color: var(--border) !important; color: var(--text) !important; min-height: 2rem; }
         .ts-control input { color: var(--text) !important; }
-        
+
         /* Force dropdown to act like a centered modal on small screens */
         .ts-dropdown {
             background: var(--surface) !important;
@@ -150,7 +150,7 @@
             overflow-y: auto !important;
             z-index: 9999 !important;
             box-shadow: 0 0 50px rgba(0,0,0,1);
-            font-size: 0.85em; /* Smaller font as requested */
+            font-size: 0.85rem; /* Smaller font as requested */
         }
 
         /* Show the input control at the top */
@@ -163,8 +163,8 @@
             background: #111 !important;
             border-bottom: 1px solid var(--accent) !important;
             border-radius: 0 !important;
-            margin-bottom: 4px !important;
-            padding: 6px 8px !important;
+            margin-bottom: 0.25rem !important;
+            padding: 0.375rem 0.5rem !important;
             position: sticky !important;
             top: 0 !important;
             z-index: 1 !important;
@@ -176,7 +176,7 @@
             border: none !important;
             outline: none !important;
             width: 100% !important;
-            font-size: 0.9em !important;
+            font-size: 0.9rem !important;
         }
 
         .ts-dropdown .ts-dropdown-content {
@@ -185,7 +185,7 @@
 
         .ts-dropdown .option {
             color: var(--text);
-            padding: 4px 8px !important; /* Reduced padding */
+            padding: 0.25rem 0.5rem !important; /* Reduced padding */
             border-bottom: 1px solid #222;
             display: flex;
             justify-content: space-between;
@@ -193,7 +193,7 @@
             line-height: 1.3 !important; /* Tighter line height */
         }
         .ts-dropdown .option:hover, .ts-dropdown .active { background: var(--accent) !important; color: black !important; }
-        .model-price { font-size: 0.75em; opacity: 0.7; }
+        .model-price { font-size: 0.75rem; opacity: 0.7; }
 
         /* Hide the "create" option if present */
         .ts-dropdown .ts-dropdown-create {
@@ -236,7 +236,7 @@
 
 <!-- HISTORY -->
 <div id="history">
-    <div class="msg sys"><strong>Nokiamancy v0.8c</strong><br>Fixed Scaling. Toggle Btns. Pricing.</div>
+    <div class="msg sys"><strong>Nokiamancy v0.9a</strong><br>Latest Release with Enhanced Features.</div>
 </div>
 
 <!-- FOOTER -->
@@ -256,7 +256,7 @@
     <div id="settingsPane">
         <div>
             <div class="section-label" style="margin:0;">UI SCALE</div>
-            <input id="fontSize" value="12" style="width:50px;" onchange="applyFontSize()">
+            <input id="fontSize" value="12" style="width:3.125rem;" onchange="applyFontSize()">
         </div>
 
         <div class="section-label">PROVIDER</div>
@@ -269,7 +269,7 @@
         </select>
         <div class="row-flex">
             <input type="password" id="apiKey" placeholder="API Key" onchange="saveApiKey()" style="flex:1;">
-            <button class="icon-btn" onclick="document.getElementById('apiKeyFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load from file">📁</button>
+            <button class="icon-btn" onclick="document.getElementById('apiKeyFile').click()" tabindex="0" style="flex:0 0 1.5rem; font-size:0.8rem;" title="Load from file"><i class="material-icons">drive_folder_upload</i></button>
             <input type="file" id="apiKeyFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env" style="display:none;" onchange="loadFileToField('apiKey', this)">
         </div>
 		
@@ -277,18 +277,18 @@
         <div class="row-flex">
             <!-- Dropdown placeholder -->
             <select id="modelSelect" placeholder="Model..." onchange="saveState()" style="flex:1; margin:0;width:100%;"></select>
-            <button id="btnRefresh" class="icon-btn" onclick="refreshModels()" tabindex="0" style="flex:0 0 32px;">↻</button>
+            <button id="btnRefresh" class="icon-btn" onclick="refreshModels()" tabindex="0" style="flex:0 0 2rem;">↻</button>
         </div>
-        <div id="modelStatus" style="font-size:0.8em; color:#666; text-align:right;">Ready</div>
+        <div id="modelStatus" style="font-size:0.8rem; color:#666; text-align:right;">Ready</div>
 	<div class="section-label">CLOUD SYNC (Airtable)</div>
 	<div class="row-flex">
 	    <input type="text" id="atBase" placeholder="Base ID (app...)" onchange="saveCreds()" style="flex:1;">
-	    <button class="icon-btn" onclick="document.getElementById('atBaseFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load from file">📁</button>
+	    <button class="icon-btn" onclick="document.getElementById('atBaseFile').click()" tabindex="0" style="flex:0 0 1.5rem; font-size:0.8rem;" title="Load from file"><i class="material-icons">drive_folder_upload</i></button>
 	    <input type="file" id="atBaseFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env" style="display:none;" onchange="loadFileToField('atBase', this)">
 	</div>
 	<div class="row-flex">
 	    <input type="password" id="atToken" placeholder="Token (pat...)" onchange="saveCreds()" style="flex:1;">
-	    <button class="icon-btn" onclick="document.getElementById('atTokenFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load from file">📁</button>
+	    <button class="icon-btn" onclick="document.getElementById('atTokenFile').click()" tabindex="0" style="flex:0 0 1.5rem; font-size:0.8rem;" title="Load from file"><i class="material-icons">drive_folder_upload</i></button>
 	    <input type="file" id="atTokenFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env" style="display:none;" onchange="loadFileToField('atToken', this)">
 	</div>
 	<div class="row-flex">
@@ -325,18 +325,19 @@
                 <option value="glm_think">🧠 GLM</option>
                 <option value="unhinged">⚠️ Unhinged</option>
             </select>
-            <button id="btnEditSys" class="icon-btn" onclick="openEditor('sys')" tabindex="0" style="flex:0 0 32px;"><i class="material-icons">edit</i></button>
-            <button class="icon-btn" onclick="document.getElementById('promptFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load prompt from file">📁</button>
+            <button id="btnEditSys" class="icon-btn" onclick="openEditor('sys')" tabindex="0" style="flex:0 0 1.5rem; font-size:0.8rem;" title="Edit system prompt"><i class="material-icons">edit</i></button>
+            <button class="icon-btn" onclick="document.getElementById('promptFile').click()" tabindex="0" style="flex:0 0 1.5rem; font-size:0.8rem;" title="Load prompt from file"><i class="material-icons">drive_folder_upload</i></button>
             <input type="file" id="promptFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env,.md" style="display:none;" onchange="loadPromptFromFile(this)">
         </div>
 
         <div class="section-label">CARD</div>
         <div class="row-flex">
-            <input type="file" id="fileUpload" accept=".png, .json" style="flex:1; margin:0; font-size:10px;">
-            <button id="btnClearCard" class="icon-btn" style="background:#400; color:#faa; flex:0 0 32px;" onclick="clearCard()" tabindex="0"><i class="material-icons">clear</i></button>
-            <button id="btnEditCard" class="icon-btn" onclick="openEditor('card')" tabindex="0" style="flex:0 0 32px;"><i class="material-icons">edit</i></button>
+            <input type="file" id="fileUpload" accept=".png, .json" style="flex:1; margin:0; font-size:0.625rem; display:none;">
+            <button class="icon-btn" onclick="document.getElementById('fileUpload').click()" tabindex="0" style="flex:0 0 1.5rem; font-size:0.8rem;" title="Load card from file"><i class="material-icons">drive_folder_upload</i></button>
+            <button id="btnEditCard" class="icon-btn" onclick="openEditor('card')" tabindex="0" style="flex:0 0 1.5rem; font-size:0.8rem;" title="Edit card"><i class="material-icons">edit</i></button>
+            <button id="btnClearCard" class="icon-btn" style="background:#400; color:#faa; flex:0 0 1.5rem; font-size:0.8rem;" onclick="clearCard()" tabindex="0" title="Clear card"><i class="material-icons">clear</i></button>
         </div>
-        <div id="cardStatus" style="font-size:0.8em; color:#666;">No card loaded</div>
+        <div id="cardStatus" style="font-size:0.8rem; color:#666; text-align:right;">No card loaded</div>
 
         <div class="section-label">STATE</div>
         <div class="row-grid-3">
@@ -401,7 +402,8 @@
 
         // Load Font & UI Config
         const fs = localStorage.getItem("gs_fontsize") || "12";
-        document.body.style.fontSize = fs + "px"; 
+        const fsRem = (parseFloat(fs) / 16).toFixed(3); // Convert px to rem (16px = 1rem)
+        document.body.style.fontSize = fsRem + "rem";
         if(document.getElementById("fontSize")) document.getElementById("fontSize").value = fs;
         
         state.tools = (localStorage.getItem("gs_tools") === "true");
@@ -458,7 +460,8 @@
 
     window.applyFontSize = function() {
         const s = document.getElementById("fontSize").value;
-        document.body.style.fontSize = s + "px";
+        const sRem = (parseFloat(s) / 16).toFixed(3); // Convert px to rem (16px = 1rem)
+        document.body.style.fontSize = sRem + "rem";
         localStorage.setItem("gs_fontsize", s);
     };
 
@@ -865,7 +868,8 @@ window.refreshModels = async function() {
                     // Restore UI settings
                     if(importData.fontSize) {
                         document.getElementById("fontSize").value = importData.fontSize;
-                        document.body.style.fontSize = importData.fontSize + "px";
+                        const fsRem = (parseFloat(importData.fontSize) / 16).toFixed(3); // Convert px to rem
+                        document.body.style.fontSize = fsRem + "rem";
                     }
 
                     // Restore state
@@ -942,7 +946,7 @@ window.refreshModels = async function() {
         state = { tools: false, enterToSend: true };
 
         // Clear UI
-        if(els.history) els.history.innerHTML = '<div class="msg sys"><strong>Nokiamancy v0.8c</strong><br>Fixed Scaling. Toggle Btns. Pricing.</div>';
+        if(els.history) els.history.innerHTML = '<div class="msg sys"><strong>Nokiamancy v0.9a</strong><br>Latest Release with Enhanced Features.</div>';
         if(els.input) els.input.value = "";
 
         // Clear localStorage
@@ -953,7 +957,7 @@ window.refreshModels = async function() {
 
         // Reset UI elements
         document.getElementById("fontSize").value = "12";
-        document.body.style.fontSize = "12px";
+        document.body.style.fontSize = "0.75rem"; // 12px = 0.75rem
         document.getElementById("temp").value = "1.0";
         document.getElementById("topP").value = "1.0";
         document.getElementById("maxTokens").value = "16000";
