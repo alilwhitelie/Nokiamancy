@@ -62,20 +62,38 @@
         #footer { background: var(--surface); border-top: 1px solid var(--border); padding: 0.25rem; margin-top: 0.5rem; }
         #controls { display: block; }
 
-        /*
-           BUTTON ROW SCALING
-           User Request: 1.5x the size of the UI scale.
-        */
-        #buttonRow button.icon-btn {
-            display: flex;
+ /* =========================================
+           BUTTON ROW FIX (The Fat Thumb Edition)
+           ========================================= */
+        
+        /* 1. THE PARENT (Forces them side-by-side) */
+        #buttonRow { 
+            display: flex !important; /* Force flex mode */
+            flex-direction: row !important; /* Force horizontal */
             justify-content: space-between;
-            gap: 0.25rem;
-            margin-top: 0.25rem;
-            font-size: 1.5rem; /* 1.5x current font size */
+            width: 100%; 
+            gap: 0.25rem; 
+            margin-top: 0.35rem; 
         }
-        .material-icons {
-            font-size: 1rem;
-            vertical-align: middle;
+
+        /* 2. THE CHILDREN (Your specific selector) */
+        #buttonRow button.icon-btn {
+            flex: 1;                 /* Grow to share width equally */
+            display: flex;           /* Center the icon */
+            justify-content: center;
+            align-items: center;
+            
+            /* SIZING - All rem, all day */
+            min-height: 2rem;      /* ~56px tall (Very easy to tap) */
+            font-size: 1.5rem !important; /* 24px base size for icons */
+            padding: 0;              /* Reset padding so height takes over */
+            margin: 0;
+        }
+
+        /* 3. THE ICONS (Force them to inherit the big size) */
+        #buttonRow button.icon-btn i.material-icons {
+            font-size: 1.75rem !important; /* Make the actual symbol huge */
+            line-height: 1;
         }
 
         /* INPUTS */
