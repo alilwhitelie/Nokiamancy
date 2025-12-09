@@ -139,8 +139,8 @@
         .ts-control input { color: var(--text) !important; }
         
         /* Force dropdown to act like a centered modal on small screens */
-        .ts-dropdown { 
-            background: var(--surface) !important; 
+        .ts-dropdown {
+            background: var(--surface) !important;
             border: 1px solid var(--accent) !important;
             position: fixed !important;
             top: 50% !important; left: 50% !important;
@@ -152,9 +152,53 @@
             box-shadow: 0 0 50px rgba(0,0,0,1);
             font-size: 0.85em; /* Smaller font as requested */
         }
-        .ts-dropdown .option { color: var(--text); padding: 8px 10px; border-bottom: 1px solid #222; display: flex; justify-content: space-between;}
+
+        /* Show the input control at the top */
+        .ts-dropdown .ts-dropdown-content {
+            display: flex !important;
+            flex-direction: column !important;
+        }
+
+        .ts-dropdown .ts-control {
+            background: #111 !important;
+            border-bottom: 1px solid var(--accent) !important;
+            border-radius: 0 !important;
+            margin-bottom: 4px !important;
+            padding: 6px 8px !important;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 1 !important;
+        }
+
+        .ts-dropdown .ts-control input {
+            color: var(--text) !important;
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            width: 100% !important;
+            font-size: 0.9em !important;
+        }
+
+        .ts-dropdown .ts-dropdown-content {
+            padding: 0 !important;
+        }
+
+        .ts-dropdown .option {
+            color: var(--text);
+            padding: 4px 8px !important; /* Reduced padding */
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            min-height: auto !important; /* Remove forced height */
+            line-height: 1.3 !important; /* Tighter line height */
+        }
         .ts-dropdown .option:hover, .ts-dropdown .active { background: var(--accent) !important; color: black !important; }
-        .model-price { font-size: 0.8em; opacity: 0.7; }
+        .model-price { font-size: 0.75em; opacity: 0.7; }
+
+        /* Hide the "create" option if present */
+        .ts-dropdown .ts-dropdown-create {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -223,7 +267,11 @@
             <option value="openai">ChatGPT</option>
             <option value="gemini">Gemini</option>
         </select>
-        <input type="password" id="apiKey" placeholder="API Key" onchange="saveApiKey()">
+        <div class="row-flex">
+            <input type="password" id="apiKey" placeholder="API Key" onchange="saveApiKey()" style="flex:1;">
+            <button class="icon-btn" onclick="document.getElementById('apiKeyFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load from file">📁</button>
+            <input type="file" id="apiKeyFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env" style="display:none;" onchange="loadFileToField('apiKey', this)">
+        </div>
 		
         <div class="section-label">MODEL</div>
         <div class="row-flex">
@@ -233,8 +281,16 @@
         </div>
         <div id="modelStatus" style="font-size:0.8em; color:#666; text-align:right;">Ready</div>
 	<div class="section-label">CLOUD SYNC (Airtable)</div>
-	<input type="text" id="atBase" placeholder="Base ID (app...)" onchange="saveCreds()">
-	<input type="password" id="atToken" placeholder="Token (pat...)" onchange="saveCreds()">
+	<div class="row-flex">
+	    <input type="text" id="atBase" placeholder="Base ID (app...)" onchange="saveCreds()" style="flex:1;">
+	    <button class="icon-btn" onclick="document.getElementById('atBaseFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load from file">📁</button>
+	    <input type="file" id="atBaseFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env" style="display:none;" onchange="loadFileToField('atBase', this)">
+	</div>
+	<div class="row-flex">
+	    <input type="password" id="atToken" placeholder="Token (pat...)" onchange="saveCreds()" style="flex:1;">
+	    <button class="icon-btn" onclick="document.getElementById('atTokenFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load from file">📁</button>
+	    <input type="file" id="atTokenFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env" style="display:none;" onchange="loadFileToField('atToken', this)">
+	</div>
 	<div class="row-flex">
 	    <button onclick="syncFromCloud()" style="background:#006064; width:100%">☁️ LOAD HISTORY</button>
 	</div>
@@ -270,6 +326,8 @@
                 <option value="unhinged">⚠️ Unhinged</option>
             </select>
             <button id="btnEditSys" class="icon-btn" onclick="openEditor('sys')" tabindex="0" style="flex:0 0 32px;"><i class="material-icons">edit</i></button>
+            <button class="icon-btn" onclick="document.getElementById('promptFile').click()" tabindex="0" style="flex:0 0 24px; font-size:0.8em;" title="Load prompt from file">📁</button>
+            <input type="file" id="promptFile" accept=".txt,.csv,.json,.xml,.log,.conf,.config,.ini,.yaml,.yml,.env,.md" style="display:none;" onchange="loadPromptFromFile(this)">
         </div>
 
         <div class="section-label">CARD</div>
@@ -593,12 +651,25 @@ window.refreshModels = async function() {
         
         const options = models.map(m => ({value: m.id, text: m.name || m.id}));
         tomSelectInstance = new TomSelect(sel, {
-            options: options, 
-            maxOptions: 200, 
+            options: options,
+            maxOptions: 200,
             create: false,
-            render: { 
-                option: (d,e) => `<div>${e(d.text)}</div>`, 
-                item: (d,e) => `<div>${e(d.text)}</div>` 
+            openOnFocus: false,
+            closeAfterSelect: true,
+            hidePlaceholder: true,
+            render: {
+                option: function(data, escape) {
+                    return `<div class="option">${escape(data.text)}</div>`;
+                },
+                item: function(data, escape) {
+                    return `<div>${escape(data.text)}</div>`;
+                },
+                dropdown: function() {
+                    return '<div class="ts-dropdown-content"></div>';
+                }
+            },
+            plugins: {
+                'dropdown_input': {}
             },
             onChange: () => saveState()
         });
@@ -700,12 +771,352 @@ window.refreshModels = async function() {
 
     function saveState() {
         localStorage.setItem("gs_history", JSON.stringify(messages));
-        // Save boolean toggles too
+        localStorage.setItem("gs_sys", sysText);
+        localStorage.setItem("gs_card", cardText);
+        localStorage.setItem("gs_provider", currentProvider);
+        localStorage.setItem("gs_fontsize", document.getElementById("fontSize").value);
         localStorage.setItem("gs_tools", state.tools);
         localStorage.setItem("gs_entersend", state.enterToSend);
+
+        // Save temperature and other settings
+        localStorage.setItem("gs_temp", document.getElementById("temp").value);
+        localStorage.setItem("gs_topP", document.getElementById("topP").value);
+        localStorage.setItem("gs_maxTokens", document.getElementById("maxTokens").value);
+
+        // Save selected model
+        if(tomSelectInstance) {
+            localStorage.setItem("gs_model_" + currentProvider, tomSelectInstance.getValue());
+        }
     }
+
+    window.exportState = function() {
+        const exportData = {
+            version: "0.8c",
+            timestamp: Date.now(),
+            messages: messages,
+            sysText: sysText,
+            cardText: cardText,
+            currentProvider: currentProvider,
+            fontSize: document.getElementById("fontSize").value,
+            state: {
+                tools: state.tools,
+                enterToSend: state.enterToSend
+            },
+            settings: {
+                temp: document.getElementById("temp").value,
+                topP: document.getElementById("topP").value,
+                maxTokens: document.getElementById("maxTokens").value
+            },
+            selectedModel: tomSelectInstance ? tomSelectInstance.getValue() : "",
+            // API keys (encrypted/simplified)
+            apiKeys: {
+                openrouter: els.apiKey ? els.apiKey.value : "",
+                zai: localStorage.getItem("gs_apikey_zai") || "",
+                nanogpt: localStorage.getItem("gs_apikey_nanogpt") || "",
+                openai: localStorage.getItem("gs_apikey_openai") || "",
+                gemini: localStorage.getItem("gs_apikey_gemini") || ""
+            },
+            airtableConfig: airtableConfig
+        };
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([dataStr], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `nokiamancy-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // Show feedback
+        if(els.status) {
+            els.status.innerText = "State exported!";
+            setTimeout(() => { els.status.innerText = "Ready"; }, 2000);
+        }
+    };
+
+    window.importState = function(fileInput) {
+        const file = fileInput.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importData = JSON.parse(e.target.result);
+
+                    // Restore messages
+                    if(importData.messages) {
+                        messages = importData.messages;
+                        if(els.history) els.history.innerHTML = "";
+                        messages.forEach(m => {
+                            if(m.role !== 'system') renderMessage(m.role, m.content);
+                        });
+                    }
+
+                    // Restore text data
+                    if(importData.sysText) sysText = importData.sysText;
+                    if(importData.cardText) cardText = importData.cardText;
+
+                    // Restore provider
+                    if(importData.currentProvider) {
+                        currentProvider = importData.currentProvider;
+                        if(els.provider) els.provider.value = currentProvider;
+                    }
+
+                    // Restore UI settings
+                    if(importData.fontSize) {
+                        document.getElementById("fontSize").value = importData.fontSize;
+                        document.body.style.fontSize = importData.fontSize + "px";
+                    }
+
+                    // Restore state
+                    if(importData.state) {
+                        state.tools = importData.state.tools || false;
+                        state.enterToSend = importData.state.enterToSend !== false; // default true
+                        updateToggleUI('tools');
+                        updateToggleUI('enter');
+                    }
+
+                    // Restore settings
+                    if(importData.settings) {
+                        if(importData.settings.temp) document.getElementById("temp").value = importData.settings.temp;
+                        if(importData.settings.topP) document.getElementById("topP").value = importData.settings.topP;
+                        if(importData.settings.maxTokens) document.getElementById("maxTokens").value = importData.settings.maxTokens;
+                    }
+
+                    // Restore API keys
+                    if(importData.apiKeys) {
+                        for(const [provider, key] of Object.entries(importData.apiKeys)) {
+                            if(key) localStorage.setItem("gs_apikey_" + provider, key);
+                        }
+                        if(currentProvider && importData.apiKeys[currentProvider]) {
+                            if(els.apiKey) els.apiKey.value = importData.apiKeys[currentProvider];
+                        }
+                    }
+
+                    // Restore Airtable config
+                    if(importData.airtableConfig) {
+                        airtableConfig = importData.airtableConfig;
+                        if(els.atBase) els.atBase.value = airtableConfig.baseId || "";
+                        if(els.atToken) els.atToken.value = airtableConfig.token || "";
+                        localStorage.setItem("nk_at_base", airtableConfig.baseId || "");
+                        localStorage.setItem("nk_at_token", airtableConfig.token || "");
+                    }
+
+                    // Restore selected model
+                    if(importData.selectedModel) {
+                        localStorage.setItem("gs_model_" + currentProvider, importData.selectedModel);
+                        // Refresh models to apply selection
+                        setTimeout(() => refreshModels(), 500);
+                    }
+
+                    saveState();
+
+                    // Show feedback
+                    if(els.status) {
+                        els.status.innerText = "State imported!";
+                        setTimeout(() => { els.status.innerText = "Ready"; }, 2000);
+                    }
+
+                } catch(e) {
+                    alert("Import failed: " + e.message);
+                }
+
+                // Clear file input
+                fileInput.value = '';
+            };
+            reader.readAsText(file);
+        }
+    };
+
+    window.askWipe = function() {
+        document.getElementById("modalTitle").innerText = "DELETE ALL DATA?";
+        document.getElementById("modalText").innerText = "This will erase all messages, settings, and API keys. This cannot be undone!";
+        document.getElementById("modalOverlay").style.display = "flex";
+    };
+
+    window.handleModalYes = function() {
+        // Clear all data
+        messages = [];
+        sysText = "You are helpful.";
+        cardText = "";
+        state = { tools: false, enterToSend: true };
+
+        // Clear UI
+        if(els.history) els.history.innerHTML = '<div class="msg sys"><strong>Nokiamancy v0.8c</strong><br>Fixed Scaling. Toggle Btns. Pricing.</div>';
+        if(els.input) els.input.value = "";
+
+        // Clear localStorage
+        localStorage.clear();
+
+        // Reset API key field
+        if(els.apiKey) els.apiKey.value = "";
+
+        // Reset UI elements
+        document.getElementById("fontSize").value = "12";
+        document.body.style.fontSize = "12px";
+        document.getElementById("temp").value = "1.0";
+        document.getElementById("topP").value = "1.0";
+        document.getElementById("maxTokens").value = "16000";
+
+        updateToggleUI('tools');
+        updateToggleUI('enter');
+
+        closeModal();
+
+        if(els.status) {
+            els.status.innerText = "All data cleared";
+            setTimeout(() => { els.status.innerText = "Ready"; }, 2000);
+        }
+    };
+
+    window.closeModal = function() {
+        document.getElementById("modalOverlay").style.display = "none";
+    };
     
     function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+
+    // --- 9. FILE LOADING UTILITIES ---
+    window.loadFileToField = function(fieldId, fileInput) {
+        const file = fileInput.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let content = e.target.result.trim();
+
+                // Handle JSON format - try to extract relevant values
+                try {
+                    if(file.name.endsWith('.json')) {
+                        const jsonData = JSON.parse(content);
+
+                        // Try to extract common key patterns
+                        const keys = ['api_key', 'apiKey', 'key', 'token', 'base_id', 'baseId', 'base', 'secret'];
+                        for(const key of keys) {
+                            if(jsonData[key]) {
+                                content = jsonData[key];
+                                break;
+                            }
+                        }
+                        // If no common keys found, use the entire JSON
+                    }
+
+                    // Handle CSV - take first non-empty value
+                    if(file.name.endsWith('.csv')) {
+                        const lines = content.split('\n');
+                        for(const line of lines) {
+                            const values = line.split(',');
+                            for(const val of values) {
+                                const trimmed = val.trim().replace(/"/g, '');
+                                if(trimmed) {
+                                    content = trimmed;
+                                    break;
+                                }
+                            }
+                            if(content && content !== e.target.result.trim()) break;
+                        }
+                    }
+
+                    // Handle XML - extract text content
+                    if(file.name.endsWith('.xml')) {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(content, "text/xml");
+                        const textContent = xmlDoc.documentElement.textContent || xmlDoc.documentElement.innerText;
+                        if(textContent.trim()) {
+                            content = textContent.trim();
+                        }
+                    }
+
+                } catch(e) {
+                    // If parsing fails, use raw content
+                }
+
+                document.getElementById(fieldId).value = content;
+
+                // Trigger corresponding save function
+                if(fieldId === 'apiKey') saveApiKey();
+                else if(fieldId === 'atBase' || fieldId === 'atToken') saveCreds();
+
+                // Clear file input
+                fileInput.value = '';
+            };
+            reader.readAsText(file);
+        }
+    };
+
+    window.loadPromptFromFile = function(fileInput) {
+        const file = fileInput.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let content = e.target.result.trim();
+
+                // Handle different formats intelligently
+                try {
+                    // JSON - look for prompt/message fields
+                    if(file.name.endsWith('.json')) {
+                        const jsonData = JSON.parse(content);
+                        const promptKeys = ['prompt', 'system', 'message', 'instruction', 'text', 'content'];
+                        for(const key of promptKeys) {
+                            if(jsonData[key]) {
+                                content = jsonData[key];
+                                break;
+                            }
+                        }
+                    }
+
+                    // CSV - take first non-empty cell
+                    if(file.name.endsWith('.csv')) {
+                        const lines = content.split('\n');
+                        for(const line of lines) {
+                            const values = line.split(',');
+                            for(const val of values) {
+                                const trimmed = val.trim().replace(/"/g, '');
+                                if(trimmed && trimmed.length > 10) { // Prefer longer text for prompts
+                                    content = trimmed;
+                                    break;
+                                }
+                            }
+                            if(content && content !== e.target.result.trim()) break;
+                        }
+                    }
+
+                    // XML - extract text content
+                    if(file.name.endsWith('.xml')) {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(content, "text/xml");
+                        const textContent = xmlDoc.documentElement.textContent || xmlDoc.documentElement.innerText;
+                        if(textContent.trim()) {
+                            content = textContent.trim();
+                        }
+                    }
+
+                    // Markdown - remove markdown syntax for cleaner prompts
+                    if(file.name.endsWith('.md')) {
+                        content = content.replace(/^#+\s*/gm, '') // Remove headers
+                                      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+                                      .replace(/\*(.*?)\*/g, '$1') // Remove italics
+                                      .replace(/`(.*?)`/g, '$1') // Remove inline code
+                                      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Remove links, keep text
+                    }
+
+                } catch(e) {
+                    // If parsing fails, use raw content
+                }
+
+                sysText = content;
+                saveState();
+
+                // Show feedback
+                if(els.status) {
+                    els.status.innerText = "Prompt loaded from file";
+                    setTimeout(() => { els.status.innerText = "Ready"; }, 2000);
+                }
+
+                // Clear file input
+                fileInput.value = '';
+            };
+            reader.readAsText(file);
+        }
+    };
 </script>
 </body>
 </html>
