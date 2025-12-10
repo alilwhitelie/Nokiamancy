@@ -329,7 +329,7 @@
             <button id="btnWipe" style="background:#3e0000; color:#ffb4ab;" onclick="askWipe()" tabindex="0"><i class="material-icons">delete</i> DELETE</button>
         </div>
         <input type="file" id="importStateFile" accept=".json" style="display:none;" onchange="importState(this)">
-        <input type="file" id="fileUpload" accept=".png,.json" style="display:none;">
+        <input type="file" id="fileUpload" accept=".png,.json" style="display:none;" onchange="handleCardUpload(this)">
     </div>
 </div>
 
@@ -491,6 +491,70 @@
             reader.readAsText(file);
             fileInput.value = '';
         }
+    };
+
+    // ——— FIELD UPLOAD FUNCTIONS ———
+    window.loadFileToField = function(fieldId, fileInput) {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = e.target.result;
+                if (fieldId === 'apiKey') {
+                    saveApiKey();
+                }
+            }
+        };
+        reader.readAsText(file);
+        fileInput.value = '';
+    };
+
+    window.loadPromptFromFile = function(fileInput) {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            sysText = e.target.result;
+            localStorage.setItem("gs_sys", sysText);
+            renderSysMsg("System prompt loaded from file.");
+        };
+        reader.readAsText(file);
+        fileInput.value = '';
+    };
+
+    window.handleCardUpload = function(fileInput) {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        if (file.type === 'application/json' || file.name.toLowerCase().endsWith('.json')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    cardText = e.target.result;
+                    localStorage.setItem("gs_card", cardText);
+                    // Try to parse for name
+                    let name = file.name;
+                    try {
+                        const json = JSON.parse(cardText);
+                        name = json.name || json.character_name || name;
+                    } catch {}
+                    document.getElementById("cardStatus").innerText = `Card loaded: ${name}`;
+                    renderSysMsg("Card loaded from file.");
+                } catch (err) {
+                    renderSysMsg("Error loading card: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        } else if (file.type === 'image/png') {
+            renderSysMsg("PNG card loading not implemented yet - please use JSON format.");
+        } else {
+            renderSysMsg("Unsupported file type for card (use JSON or PNG).");
+        }
+        fileInput.value = '';
     };
 
     // ——— MODEL MODAL FUNCTIONS ———
