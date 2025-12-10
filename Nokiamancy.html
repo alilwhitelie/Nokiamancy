@@ -125,7 +125,7 @@
         .row-flex { display: flex; gap: 0.25rem; align-items: center; }
         .row-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem; }
 
-        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 100; flex-direction: column; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 100; flex-direction: column; }
         .overlay-header { display: flex; justify-content: space-between; padding: 0.5rem; background: var(--surface); }
         .overlay-body { flex: 1; padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; }
         .full-text-editor { flex: 1; background: #111; color: var(--text); border: 1px solid var(--border); font-family: monospace; }
@@ -214,13 +214,10 @@
 </div>
 
 <div id="modelModal" class="overlay">
-    <div class="overlay-header">
-        <span style="color:var(--accent); font-weight:bold;">SELECT MODEL</span>
-        <button id="closeModelModal" style="background:var(--danger);" onclick="closeModelModal()" tabindex="0">✕</button>
-    </div>
     <div class="overlay-body" style="padding:0;">
-        <div style="padding:0.5rem; border-bottom:1px solid #333;">
-            <input type="text" id="modelFilter" placeholder="Filter models..." style="width:100%; font-size:0.8rem;" oninput="filterModels(this.value)">
+        <div style="padding:0.5rem; border-bottom:1px solid #333; display:flex; gap:0.5rem; align-items:center;">
+            <input type="text" id="modelFilter" placeholder="Filter models..." style="flex:1; font-size:0.8rem;" oninput="filterModels(this.value)">
+            <button id="closeModelModal" style="background:var(--danger); padding:0.25rem 0.5rem; font-size:1rem;" onclick="closeModelModal()" tabindex="0">✕</button>
         </div>
         <div id="modelList" style="flex:1; overflow-y:auto; font-size:0.8rem;"></div>
     </div>
@@ -282,7 +279,7 @@
         <div class="section-label">MODEL</div>
         <div class="row-flex">
             <input type="text" id="modelSelect" placeholder="Select model..." readonly onclick="openModelModal()" style="flex:1; margin:0;width:100%; cursor:pointer;" tabindex="0">
-            <button id="btnRefresh" class="icon-btn" onclick="refreshModels()" tabindex="0" style="flex:0 0 1.5rem;">Refresh</button>
+            <button id="btnRefresh" class="icon-btn" onclick="refreshModels()" tabindex="0" style="flex:0 0 1.5rem;"><i class="material-icons">refresh</i></button>
         </div>
         <div id="modelStatus" style="font-size:1rem; color:#666; text-align:right;">Ready</div>
 
@@ -348,7 +345,7 @@
     let els = {}, messages = [], tomSelectInstance = null;
     let state = { tools: false, enterToSend: true };
     let sysText = "You are helpful.", cardText = "", currentProvider = "openrouter";
-    let attachedFiles = [], allModels = [], selectedModel = null;
+    let attachedFiles = [], allModels = [], selectedModel = null, currentModelIndex = 0;
 
     window.onload = function() {
         els = {
@@ -357,7 +354,8 @@
             settings: document.getElementById("settingsPane"),
             status: document.getElementById("modelStatus"),
             apiKey: document.getElementById("apiKey"),
-            provider: document.getElementById("providerSelect")
+            provider: document.getElementById("providerSelect"),
+            modelFilter: document.getElementById("modelFilter")
         };
 
         const fs = localStorage.getItem("gs_fontsize") || "12";
@@ -380,7 +378,57 @@
         els.input.addEventListener("keydown", (e) => {
             if(e.key === "Enter" && !e.shiftKey && state.enterToSend) { e.preventDefault(); sendMessage(); }
         });
+
+        // Dpad navigation for model filter
+        if(els.modelFilter) {
+            els.modelFilter.addEventListener("keydown", (e) => {
+                const modal = document.getElementById('modelModal');
+                if(modal.style.display !== 'flex') return;
+
+                if(e.key === "ArrowDown") {
+                    e.preventDefault();
+                    navigateModelList(1);
+                } else if(e.key === "ArrowUp") {
+                    e.preventDefault();
+                    navigateModelList(-1);
+                } else if(e.key === "Enter") {
+                    e.preventDefault();
+                    const filtered = getFilteredModels();
+                    if(currentModelIndex < filtered.length) {
+                        selectModel(filtered[currentModelIndex].id);
+                    }
+                }
+            });
+        }
     };
+
+    function navigateModelList(direction) {
+        const filtered = getFilteredModels();
+        if(filtered.length === 0) return;
+
+        currentModelIndex = Math.max(0, Math.min(filtered.length - 1, currentModelIndex + direction));
+        highlightModelItem(currentModelIndex);
+    }
+
+    function getFilteredModels() {
+        const filterText = els.modelFilter.value.toLowerCase();
+        return allModels.filter(model =>
+            model.id.toLowerCase().includes(filterText) ||
+            model.displayName.toLowerCase().includes(filterText)
+        );
+    }
+
+    function highlightModelItem(index) {
+        const items = document.querySelectorAll('.model-item');
+        items.forEach((item, i) => {
+            if(i === index) {
+                item.classList.add('selected');
+                item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
 
     // ——— FIXED FUNCTIONS ———
     window.toggleSettings = () => {
@@ -449,7 +497,12 @@
     window.openModelModal = function() {
         document.getElementById('modelModal').style.display = 'flex';
         document.getElementById('modelFilter').value = '';
+        currentModelIndex = 0;
         renderModelList(allModels);
+        // Focus on filter input
+        setTimeout(() => {
+            document.getElementById('modelFilter').focus();
+        }, 100);
     };
 
     window.closeModelModal = function() {
@@ -457,6 +510,7 @@
     };
 
     window.filterModels = function(filterText) {
+        currentModelIndex = 0;
         const filtered = allModels.filter(model =>
             model.id.toLowerCase().includes(filterText.toLowerCase()) ||
             model.displayName.toLowerCase().includes(filterText.toLowerCase())
@@ -487,22 +541,19 @@
             if (currentProvider === 'openrouter' && model.pricing) {
                 const inputPrice = model.pricing.prompt;
                 if (inputPrice && inputPrice !== '0') {
-                    pricingInfo = `<span class="model-price">$${inputPrice}/1M</span>`;
+                    const formattedPrice = parseFloat(inputPrice).toFixed(3);
+                    pricingInfo = `<span class="model-price">$${formattedPrice}/1M</span>`;
                 }
             } else if (currentProvider === 'nanogpt' && model.pricing?.input) {
                 const inputPrice = model.pricing.input;
-                pricingInfo = `<span class="model-price">$${inputPrice}/1M</span>`;
+                const formattedPrice = parseFloat(inputPrice).toFixed(3);
+                pricingInfo = `<span class="model-price">$${formattedPrice}/1M</span>`;
             }
 
             return `
-                <div class="model-item ${isSelected ? 'selected' : ''}" onclick="selectModel('${model.id}')">
-                    <div>
-                        <div class="model-name">${model.displayName || model.id}</div>
-                        <div style="font-size:0.7rem; color:#666;">${model.id}</div>
-                    </div>
-                    <div class="model-info">
-                        ${pricingInfo}
-                    </div>
+                <div class="model-item ${isSelected ? 'selected' : ''}" onclick="selectModel('${model.id}')" data-index="${model.id}">
+                    <div class="model-name">${model.id}</div>
+                    ${pricingInfo ? `<div class="model-info">${pricingInfo}</div>` : ''}
                 </div>
             `;
         }).join('');
