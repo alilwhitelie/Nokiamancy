@@ -6,6 +6,7 @@
     <title>Nokiamancy v0.9a</title>
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.default.min.css">
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
@@ -23,6 +24,23 @@
         /* FORCE ROBOTO / SANS-SERIF EVERYWHERE */
         *, *::before, *::after, button, input, select, textarea {
             font-family: Roboto, system-ui, sans-serif !important;
+        }
+
+        /* Material Icons fallback and proper display */
+        .material-icons {
+            font-family: 'Material Icons' !important;
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
         }
 
         body {
@@ -120,6 +138,38 @@
         .code-header { background: #222; padding: 0.125rem 0.3125rem; display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; }
         .code-content { padding: 0.3125rem; font-size: 0.9rem; white-space: pre-wrap; overflow-x: auto; color: #ccc; }
 
+        /* Model Modal Styles */
+        .model-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #222;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.1s;
+            font-size: 0.8rem;
+        }
+        .model-item:hover {
+            background: #1a1a1a;
+        }
+        .model-item.selected {
+            background: var(--accent);
+            color: black;
+        }
+        .model-name {
+            font-weight: 500;
+            flex: 1;
+        }
+        .model-info {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.7rem;
+            color: #888;
+        }
+        .model-price {
+            color: var(--success);
+        }
+
         /* TOM SELECT – READABLE MODEL LIST */
         .ts-control { background: #000 !important; border-color: var(--border) !important; color: var(--text) !important; min-height: 2rem; }
         .ts-dropdown {
@@ -160,6 +210,19 @@
     </div>
     <div class="overlay-body">
         <textarea id="editorContent" class="full-text-editor"></textarea>
+    </div>
+</div>
+
+<div id="modelModal" class="overlay">
+    <div class="overlay-header">
+        <span style="color:var(--accent); font-weight:bold;">SELECT MODEL</span>
+        <button id="closeModelModal" style="background:var(--danger);" onclick="closeModelModal()" tabindex="0">✕</button>
+    </div>
+    <div class="overlay-body" style="padding:0;">
+        <div style="padding:0.5rem; border-bottom:1px solid #333;">
+            <input type="text" id="modelFilter" placeholder="Filter models..." style="width:100%; font-size:0.8rem;" oninput="filterModels(this.value)">
+        </div>
+        <div id="modelList" style="flex:1; overflow-y:auto; font-size:0.8rem;"></div>
     </div>
 </div>
 
@@ -218,7 +281,7 @@
 
         <div class="section-label">MODEL</div>
         <div class="row-flex">
-            <select id="modelSelect" placeholder="Model..." onchange="saveState()" style="flex:1; margin:0;width:100%;"></select>
+            <input type="text" id="modelSelect" placeholder="Select model..." readonly onclick="openModelModal()" style="flex:1; margin:0;width:100%; cursor:pointer;" tabindex="0">
             <button id="btnRefresh" class="icon-btn" onclick="refreshModels()" tabindex="0" style="flex:0 0 1.5rem;">Refresh</button>
         </div>
         <div id="modelStatus" style="font-size:1rem; color:#666; text-align:right;">Ready</div>
@@ -285,7 +348,7 @@
     let els = {}, messages = [], tomSelectInstance = null;
     let state = { tools: false, enterToSend: true };
     let sysText = "You are helpful.", cardText = "", currentProvider = "openrouter";
-    let attachedFiles = [];
+    let attachedFiles = [], allModels = [], selectedModel = null;
 
     window.onload = function() {
         els = {
@@ -382,6 +445,69 @@
         }
     };
 
+    // ——— MODEL MODAL FUNCTIONS ———
+    window.openModelModal = function() {
+        document.getElementById('modelModal').style.display = 'flex';
+        document.getElementById('modelFilter').value = '';
+        renderModelList(allModels);
+    };
+
+    window.closeModelModal = function() {
+        document.getElementById('modelModal').style.display = 'none';
+    };
+
+    window.filterModels = function(filterText) {
+        const filtered = allModels.filter(model =>
+            model.id.toLowerCase().includes(filterText.toLowerCase()) ||
+            model.displayName.toLowerCase().includes(filterText.toLowerCase())
+        );
+        renderModelList(filtered);
+    };
+
+    window.selectModel = function(modelId) {
+        selectedModel = modelId;
+        document.getElementById('modelSelect').value = modelId;
+        localStorage.setItem("gs_model_" + currentProvider, modelId);
+        closeModelModal();
+        saveState();
+    };
+
+    function renderModelList(models) {
+        const listEl = document.getElementById('modelList');
+        if (!models || models.length === 0) {
+            listEl.innerHTML = '<div style="padding:2rem; text-align:center; color:#666;">No models found</div>';
+            return;
+        }
+
+        const currentModel = document.getElementById('modelSelect').value;
+        listEl.innerHTML = models.map(model => {
+            const isSelected = model.id === currentModel || model.id === selectedModel;
+            let pricingInfo = '';
+
+            if (currentProvider === 'openrouter' && model.pricing) {
+                const inputPrice = model.pricing.prompt;
+                if (inputPrice && inputPrice !== '0') {
+                    pricingInfo = `<span class="model-price">$${inputPrice}/1M</span>`;
+                }
+            } else if (currentProvider === 'nanogpt' && model.pricing?.input) {
+                const inputPrice = model.pricing.input;
+                pricingInfo = `<span class="model-price">$${inputPrice}/1M</span>`;
+            }
+
+            return `
+                <div class="model-item ${isSelected ? 'selected' : ''}" onclick="selectModel('${model.id}')">
+                    <div>
+                        <div class="model-name">${model.displayName || model.id}</div>
+                        <div style="font-size:0.7rem; color:#666;">${model.id}</div>
+                    </div>
+                    <div class="model-info">
+                        ${pricingInfo}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
     // ——— GEMINI + MODEL LIST FIXED ———
     window.refreshModels = async function() {
         if(els.status) els.status.innerText = "Fetching Models...";
@@ -402,37 +528,46 @@
 
             let models = [];
             if(currentProvider === "gemini") {
-                models = (data.models || data.data || data || []).map(m => ({id: m.name.replace("models/",""), displayName: m.displayName || m.name}));
+                models = (data.models || data.data || data || []).map(m => ({
+                    id: m.name.replace("models/",""),
+                    displayName: m.displayName || m.name
+                }));
                 const mustHave = ["gemini-1.5-flash","gemini-1.5-pro","gemini-1.0-pro"];
                 mustHave.forEach(id => { if(!models.some(m=>m.id.includes(id))) models.push({id, displayName: id}); });
+            } else if(currentProvider === "openrouter") {
+                models = (Array.isArray(data.data) ? data.data : data.models || data || []).map(m => ({
+                    id: m.id,
+                    displayName: m.name || m.id,
+                    pricing: m.pricing || {}
+                }));
+            } else if(currentProvider === "nanogpt") {
+                models = (Array.isArray(data.data) ? data.data : data.models || data || []).map(m => ({
+                    id: m.id,
+                    displayName: m.name || m.id,
+                    pricing: m.pricing || {}
+                }));
             } else {
-                models = (Array.isArray(data.data) ? data.data : data.models || data || []).map(m => ({id: m.id, displayName: m.name || m.id}));
+                models = (Array.isArray(data.data) ? data.data : data.models || data || []).map(m => ({
+                    id: m.id,
+                    displayName: m.name || m.id
+                }));
             }
 
             models = models.sort((a,b) => a.id.localeCompare(b.id));
+            allModels = models;
 
-            if(tomSelectInstance) tomSelectInstance.destroy();
-            tomSelectInstance = new TomSelect(document.getElementById("modelSelect"), {
-                options: models.map(m => ({value: m.id, text: m.displayName || m.id})),
-                maxOptions: 200,
-                create: false,
-                openOnFocus: true,
-                closeAfterSelect: true,
-                onChange: () => saveState()
-            });
-
+            // Update the input field with selected model
             const saved = localStorage.getItem("gs_model_" + currentProvider);
-            if(saved) tomSelectInstance.setValue(saved);
+            if(saved) {
+                document.getElementById('modelSelect').value = saved;
+                selectedModel = saved;
+            }
 
             if(els.status) els.status.innerText = `Loaded ${models.length}`;
         } catch(e) {
             if(currentProvider === "gemini") {
                 const fallback = ["gemini-1.5-flash","gemini-1.5-pro","gemini-1.0-pro"];
-                if(tomSelectInstance) tomSelectInstance.destroy();
-                tomSelectInstance = new TomSelect(document.getElementById("modelSelect"), {
-                    options: fallback.map(id=>({value:id,text:id})),
-                    create: false
-                });
+                allModels = fallback.map(id => ({id, displayName: id}));
                 if(els.status) els.status.innerText = "Gemini fallback";
             } else {
                 if(els.status) els.status.innerText = "Error";
@@ -489,7 +624,7 @@
     async function callAI(lastInput) {
         if(!els.apiKey.value) throw new Error("Missing API Key");
         const prov = PROVIDERS[currentProvider];
-        let model = tomSelectInstance?.getValue() || "openai/gpt-3.5-turbo";
+        let model = selectedModel || document.getElementById('modelSelect').value || "openai/gpt-3.5-turbo";
 
         let finalSys = sysText;
         if(cardText) finalSys += "\n\n" + cardText;
@@ -568,7 +703,7 @@
         localStorage.setItem("gs_provider", currentProvider);
         localStorage.setItem("gs_tools", state.tools);
         localStorage.setItem("gs_enter", state.enterToSend);
-        if(tomSelectInstance) localStorage.setItem("gs_model_" + currentProvider, tomSelectInstance.getValue());
+        if(selectedModel) localStorage.setItem("gs_model_" + currentProvider, selectedModel);
     }
 
     function loadHistory() {
@@ -592,7 +727,15 @@
     window.askWipe = () => { if(confirm("Delete everything?")) localStorage.clear(); location.reload(); };
     window.handleModalYes = () => {};
     window.closeModal = () => document.getElementById("modalOverlay").style.display = "none";
-    function initModelSelect() { refreshModels(); }
+    function initModelSelect() {
+        refreshModels();
+        // Load saved model into input field
+        const saved = localStorage.getItem("gs_model_" + currentProvider);
+        if(saved) {
+            selectedModel = saved;
+            document.getElementById('modelSelect').value = saved;
+        }
+    }
 </script>
 </body>
 </html>
