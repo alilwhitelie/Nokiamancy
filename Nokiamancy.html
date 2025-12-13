@@ -783,22 +783,33 @@
         const msgs = els.history.querySelectorAll(".sys");
         if(msgs.length > 0) msgs[msgs.length-1].remove();
     }
-
-    function parseMarkdown(text) {
+function parseMarkdown(text) {
         const blocks = [];
+        // Extract code blocks
         text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, l, c) => {
             blocks.push({l:l||'txt', c:c.trim()});
             return `__BLK${blocks.length-1}__`;
         });
+        
+        // Format text (Bold, Italics, Code, line breaks)
         text = text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
-        text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/`([^`]+)`/g, '<code>$1</code>');
+        text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                   .replace(/\*(.*?)\*/g, '<i>$1</i>')
+                   .replace(/`([^`]+)`/g, '<code>$1</code>');
+                   
+        // Re-inject code blocks with ESCAPED quotes
         return text.replace(/__BLK(\d+)__/g, (m, id) => {
             const b = blocks[id];
-            const safe = encodeURIComponent(b.c);
+            
+            // THE FIX: .replace(/'/g, "%27") prevents the onclick attribute from breaking
+            const safe = encodeURIComponent(b.c).replace(/'/g, "%27");
+            
             return `<div class="code-box">
                 <div class="code-header"><span>${b.l.toUpperCase()}</span>
-                    <div><button class="code-btn" onclick="copyC('${safe}')">COPY</button>
-                         <button class="code-btn" style="color:#0f0;" onclick="downC('${safe}','${b.l}')">SAVE</button></div>
+                    <div>
+                         <button class="code-btn" onclick="copyC('${safe}')">COPY</button>
+                         <button class="code-btn" style="color:#0f0;" onclick="downC('${safe}','${b.l}')">SAVE</button>
+                    </div>
                 </div>
                 <div class="code-content">${b.c.replace(/</g,"&lt;")}</div>
             </div>`;
