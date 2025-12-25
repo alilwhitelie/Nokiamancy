@@ -323,11 +323,12 @@
         <div id="cardStatus" style="font-size:1rem; color:#666; text-align:right;">No card loaded</div>
 
         <div class="section-label">STATE</div>
-        <div class="row-grid-3">
-            <button id="btnExport" style="background:#004D40;" onclick="exportState()" tabindex="0"><i class="material-icons">save</i> SAVE</button>
-            <button id="btnImport" style="background:#006064;" onclick="document.getElementById('importStateFile').click()" tabindex="0"><i class="material-icons">upload</i> LOAD</button>
-            <button id="btnWipe" style="background:#3e0000; color:#ffb4ab;" onclick="askWipe()" tabindex="0"><i class="material-icons">delete</i> DELETE</button>
-        </div>
+          <div class="row-grid-3">
+      <button id="btnExport" style="background:#004D40;" onclick="exportState()" tabindex="0"><i class="material-icons">save</i> SAVE</button>
+      <button id="btnImport" style="background:#006064;" onclick="document.getElementById('importStateFile').click()" tabindex="0"><i class="material-icons">upload</i> LOAD</button>
+      <button id="btnWipeChat" style="background:#3e1a00; color:#ffb4ab;" onclick="askWipeChat()" tabindex="0"><i class="material-icons">forum</i> CHAT</button>
+  </div>
+        <button id="btnWipeAll" style="background:#3e0000; color:#ffb4ab; width:100%; margin-top:0.25rem;" onclick="askWipeAll()" tabindex="0"><i class="material-icons">delete_forever</i> WIPE ALL SETTINGS</button>
         <input type="file" id="importStateFile" accept=".json" style="display:none;" onchange="importState(this)">
         <input type="file" id="fileUpload" accept=".png,.json" style="display:none;" onchange="handleCardUpload(this)">
     </div>
@@ -850,7 +851,22 @@ function parseMarkdown(text) {
     window.closeEditor = () => {};
     window.exportState = () => alert("Export ready in full version");
     window.importState = () => alert("Import ready in full version");
-    window.askWipe = () => { if(confirm("Delete everything?")) localStorage.clear(); location.reload(); };
+    window.askWipeChat = () => {
+        if(confirm("Trash the whole conversation?")) {
+            messages = [];
+            localStorage.removeItem("gs_history");
+            els.history.innerHTML = '<div class="msg sys"><strong>Chat Purged.</strong></div>';
+            renderSysMsg("Nokiamancy v0.9a — FIXED & CLEAN");
+        }
+    };
+    
+    window.askWipeAll = () => {
+        if(confirm("NUKE EVERYTHING? This clears API keys, models, and history.")) {
+            localStorage.clear();
+            location.reload();
+        }
+    };
+
     window.handleModalYes = () => {};
     window.closeModal = () => document.getElementById("modalOverlay").style.display = "none";
     function initModelSelect() {
